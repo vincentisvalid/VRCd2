@@ -124,6 +124,42 @@ npm run dev
 - `.fm <@user>` - Render album art now-playing embeds.
 
 ### 🎬 Media Processing Filters (FFmpeg Engine)
+- `.media` - Lists all available media processing filters and commands.
+- `.valentine` - Apply a sweet pinkish Valentine overlay filter.
+- `.rainbow` - Add a colorful rainbow color-cycling overlay to media.
+- `.blur [strength]` - Apply box blur with adjustable strength parameters.
+- `.toaster` - Apply vintage toaster color grading with vignette filter.
+- `.speechbubble` - Overlay a blank speech bubble header on top of the image.
+- `.motivate <top> <bottom>` - Generate a classic motivational poster style frame.
+- `.rubiks` - Transform media into Rubiks cube square block grids.
+- `.spin` - Generate spinning rotation effect on media.
+- `.bloom` - Apply soft bloom lighting contrast overlay.
+- `.fortune` - Render media nested inside a fortune template frame.
+- `.deepfry` - Meme style deepfry: high contrast and saturation boost.
+- `.flag` - Overlay standard flag color maps over media.
+- `.gifmagik` - Liquid rescale warp mapping on animated GIFs.
+- `.meme <top> <bottom>` - Superimpose white text on top and bottom of media.
+- `.flag2` - Apply alternate flag color maps.
+- `.heart <text>` - Generate heart outline frames with custom text.
+- `.magik` - Warp and liquid distort image maps.
+- `.caption <text>` - Attach a caption header bubble block.
+- `.circuitboard` - Convert media into green electric circuit boards outlines.
+- `.spread [strength]` - Scatters and spreads pixels randomly.
+- `.swirl [strength]` - Apply twirl vortex rotation.
+- `.book` - Render inside an opened book template grid.
+- `.wormhole` - Distort media into wormhole tunnels.
+- `.billboard` - Project media maps onto outdoor billboards templates.
+- `.pixelate` - Reduces resolution using large square pixel blocks.
+- `.tattoo` - Superimpose image as skin tattoos.
+- `.fisheye` - Simulates wide angle focal length lenses.
+- `.neon` - Add glowing neon border edge mappings.
+- `.grayscale` - Convert media to gray monochrome.
+- `.invert` - Negate and invert color maps.
+- `.scramble` - Scramble media layout locations.
+- `.reverse` - Reverse video playback frames.
+- `.zoom` - Zooms and crops center region scales.
+- `.speed <multiplier>` - Increase or decrease video speed.
+- `.zoomblur` - Generate zoom radial blurs.
 - `.glitch` - Apply blocky low-res color glitch parameters.
 - `.ascii` - Monospace character rendering of images using native HTML5 Canvas.
 - `.vhs` - Overlays tape color bleeds and tracking noise.
@@ -131,11 +167,6 @@ npm run dev
 - `.removebg` - Split white background pixels out of an image.
 - `.cut <start_time> <duration>` - Cut segments without re-encoding.
 - `.vredit` - Map flat media side-by-side into stereoscopic double-circular lenses.
-- `.grayscale` - Convert image or video to black and white.
-- `.invert` - Invert color spectrum of attached image or video.
-- `.speedup` - Doubles playback speed of attached video (2x).
-- `.slowmotion` - Slows down playback speed of video to half speed (0.5x).
-- `.mutevideo` - Removes audio streams entirely from video.
 
 ### 📜 Extended Quotes
 - `.createquote <author> | <text>` - Commit quotes to local JSON database.

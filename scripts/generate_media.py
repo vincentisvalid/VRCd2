@@ -1,6 +1,10 @@
-import { exec } from 'child_process';
+import os
+
+media_js_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/commands/media.js'))
+
+content = """import { exec } from 'child_process';
 import fs from 'fs';
-import path from 'path';
+import path from 'url';
 import { fileURLToPath } from 'url';
 import { AttachmentBuilder } from 'discord.js';
 import { respond, buildEmbed, downloadFile } from '../utils/helpers.js';
@@ -630,7 +634,7 @@ export default [
     category: 'Media Effects',
     aliases: ['vrfilter'],
     async execute(message, args, client) {
-      return runFFmpegCommand(message, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];movie='/dev/stdin'[in];[in]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r];[l][r]hstack"', 'vr_lens');
+      return runFFmpegCommand(message, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];movie=\'/dev/stdin\'[in];[in]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r];[l][r]hstack"', 'vr_lens');
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
@@ -693,7 +697,7 @@ async function runFFmpegCommand(ctx, filterString, suffix, forceExt = null) {
 
 async function runAsciiCommand(ctx) {
   const attachment = getAttachment(ctx);
-  if (!attachment || !/\\.(jpg|jpeg|png)$/i.test(attachment.name)) {
+  if (!attachment || !/\\\\.(jpg|jpeg|png)$/i.test(attachment.name)) {
     return respond(ctx, { content: 'Please attach a valid image file (PNG/JPG).' });
   }
 
@@ -725,7 +729,7 @@ async function runAsciiCommand(ctx) {
         const charIdx = Math.floor((brightness / 255) * (asciiChars.length - 1));
         asciiStr += asciiChars[charIdx];
       }
-      asciiStr += '\n';
+      asciiStr += '\\n';
     }
 
     if (asciiStr.length > 1900) {
@@ -735,7 +739,7 @@ async function runAsciiCommand(ctx) {
       await respond(ctx, { files: [file] });
       fs.unlinkSync(txtPath);
     } else {
-      await respond(ctx, { content: `\`\`\`\n${asciiStr}\`\`\`` });
+      await respond(ctx, { content: `\`\`\`\\n${asciiStr}\`\`\`` });
     }
 
   } catch (err) {
@@ -844,3 +848,9 @@ function executeShell(cmd) {
     });
   });
 }
+"""
+
+with open(media_js_path, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print('[Generator] Compiled and saved complete media.js with all 36 requested filters.')
