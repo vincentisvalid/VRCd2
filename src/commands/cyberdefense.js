@@ -447,6 +447,42 @@ export default [
       const state = interaction.options.getString('state');
       return runAntiSpamToggle(interaction, state);
     }
+  },
+  {
+    name: 'gsearch',
+    description: 'Query the web using Google Search API with fallback results.',
+    category: 'CyberDefense',
+    aliases: ['google', 'search'],
+    options: [
+      { name: 'query', type: 3, description: 'Search term', required: true }
+    ],
+    async execute(message, args, client) {
+      if (args.length === 0) return respond(message, { content: 'Usage: `.gsearch <query>`' });
+      return runGoogleSearch(message, args.join(' '));
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      const query = interaction.options.getString('query');
+      return runGoogleSearch(interaction, query);
+    }
+  },
+  {
+    name: 'gimgsearch',
+    description: 'Query Google Images API and retrieve matching visual assets.',
+    category: 'CyberDefense',
+    aliases: ['gimg', 'imagesearch'],
+    options: [
+      { name: 'query', type: 3, description: 'Image search term', required: true }
+    ],
+    async execute(message, args, client) {
+      if (args.length === 0) return respond(message, { content: 'Usage: `.gimgsearch <query>`' });
+      return runGoogleImageSearch(message, args.join(' '));
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      const query = interaction.options.getString('query');
+      return runGoogleImageSearch(interaction, query);
+    }
   }
 ];
 
@@ -1082,4 +1118,104 @@ function runAntiSpamToggle(ctx, state) {
     turnOn ? 0x00ffcc : 0xffa500
   );
   return respond(ctx, { embeds: [embed] });
+}
+
+// 24. Google search with DuckDuckGo fallback
+async function runGoogleSearch(ctx, query) {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  const cx = process.env.GOOGLE_CX;
+
+  if (apiKey && cx) {
+    try {
+      const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}`;
+      const res = await axios.get(url, { timeout: 5000 });
+      const items = res.data.items || [];
+
+      if (items.length === 0) {
+        return respond(ctx, { embeds: [buildEmbed('Google Search Results', `No items found matching *${query}*.`, [], 0xffa500)] });
+      }
+
+      const fields = items.slice(0, 3).map((item, idx) => ({
+        name: `${idx + 1}. ${item.title}`,
+        value: `[Link](${item.link})\n${item.snippet || 'No description available.'}`
+      }));
+
+      const embed = buildEmbed(`Google Search: ${query}`, `Top search index matches:`, fields, 0x4285f4);
+      return respond(ctx, { embeds: [embed] });
+    } catch (err) {
+      console.warn('[Google Search API Failed, falling back to DuckDuckGo]:', err.message);
+    }
+  }
+
+  // Fallback to DuckDuckGo Instant Answer API
+  try {
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`;
+    const res = await axios.get(url, { timeout: 5000 });
+    const abstract = res.data.AbstractText;
+    const abstractUrl = res.data.AbstractURL;
+    const related = res.data.RelatedTopics || [];
+
+    if (!abstract && related.length === 0) {
+      return respond(ctx, { embeds: [buildEmbed('Search Results', `No index results found for *${query}*.`, [], 0xffa500)] });
+    }
+
+    const fields = [];
+    if (abstract) {
+      fields.push({ name: 'Abstract Summary', value: `${abstract}\n[Source Link](${abstractUrl})` });
+    }
+
+    const topics = related.slice(0, 3).filter(t => t.Text && t.FirstURL);
+    if (topics.length > 0) {
+      const topicText = topics.map((t, i) => `• [${t.Text.slice(0, 100)}](${t.FirstURL})`).join('\n');
+      fields.push({ name: 'Related Topics', value: topicText });
+    }
+
+    const embed = buildEmbed(
+      `Search: ${query} (DuckDuckGo Fallback)`,
+      `Google API key missing or offline. Rendering fallback indices:`,
+      fields,
+      0xde5833
+    );
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Search query failed to execute: ${err.message}` });
+  }
+}
+
+// 25. Google Image Search with fallback
+async function runGoogleImageSearch(ctx, query) {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  const cx = process.env.GOOGLE_CX;
+
+  if (!apiKey || !cx) {
+    const keyMissingEmbed = buildEmbed(
+      'Google Image Search Configuration Required',
+      `This command requires \`GOOGLE_API_KEY\` and \`GOOGLE_CX\` environment variables.\n\n*Get credentials on the Google Custom Search Engine developers portal.*`,
+      [],
+      0xffa500
+    );
+    return respond(ctx, { embeds: [keyMissingEmbed] });
+  }
+
+  try {
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&q=${encodeURIComponent(query)}&searchType=image`;
+    const res = await axios.get(url, { timeout: 5000 });
+    const items = res.data.items || [];
+
+    if (items.length === 0) {
+      return respond(ctx, { embeds: [buildEmbed('Google Image Search', `No images found matching *${query}*.`, [], 0xffa500)] });
+    }
+
+    const first = items[0];
+    const embed = buildEmbed(
+      `Google Image Search: ${query}`,
+      `Title: **${first.title || 'Image'}**\n[Original Link](${first.link})`,
+      [],
+      0x4285f4
+    );
+    embed.setImage(first.link);
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Google Image search failed: ${err.message}` });
+  }
 }
