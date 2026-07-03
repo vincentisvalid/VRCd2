@@ -153,6 +153,8 @@ npm run dev
 - `.geolocate <ipv4>` - Resolves geographic information details for a targeted IPv4 address.
 
 ### ⚙️ Utilities & Integrations
+- `.gsearch <query>` - Queries Google Custom Search API with SOCKS-compliant proxy failbacks.
+- `.gimgsearch <query>` - Requests and returns matching image results via Google Custom Images.
 - `.translate <lang> <text>` - Local translation engine.
 - `.weather <location>` - Meteorology reports for locations.
 - `.crypto <ticker>` - Price updates on major blockchain indices.
