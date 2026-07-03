@@ -123,6 +123,16 @@ npm run dev
 - `.fmsetup spotify <id> <secret>` - Map Spotify developer applications.
 - `.fm <@user>` - Render album art now-playing embeds.
 
+### 🔊 Voice & Music Player
+- `.play <url>` - Stream high-quality audio from a YouTube URL (or add to queue).
+- `.pause` - Pause or resume current audio playback.
+- `.stop` - Stops playback, clears the queue, and disconnects the bot.
+- `.skip` - Skip the current playing song.
+- `.queue` - Display all upcoming songs in the server music queue.
+- `.volume <level>` - Set player volume level between 0 and 100.
+- `.np` - Display details for the currently playing song.
+- `.clearqueue` - Clear all queued songs.
+
 ### 🎬 Media Processing Filters (FFmpeg Engine)
 - `.media` - Lists all available media processing filters and commands.
 - `.valentine` - Apply a sweet pinkish Valentine overlay filter.
