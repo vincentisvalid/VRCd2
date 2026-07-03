@@ -135,6 +135,71 @@ export default [
       await interaction.deferReply();
       return runFFmpegCommand(interaction, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];split[left][right];[left]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l_lens];[right]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r_lens];[l_lens][r_lens]hstack"', 'vr_lens');
     }
+  },
+  {
+    name: 'grayscale',
+    description: 'Convert an attached image or video to grayscale (black and white).',
+    category: 'Media Effects',
+    aliases: ['bw'],
+    async execute(message, args, client) {
+      return runFFmpegCommand(message, '-vf "format=gray"', 'grayscale');
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runFFmpegCommand(interaction, '-vf "format=gray"', 'grayscale');
+    }
+  },
+  {
+    name: 'invert',
+    description: 'Invert colors of an attached image or video.',
+    category: 'Media Effects',
+    aliases: ['negative'],
+    async execute(message, args, client) {
+      return runFFmpegCommand(message, '-vf "negate"', 'inverted');
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runFFmpegCommand(interaction, '-vf "negate"', 'inverted');
+    }
+  },
+  {
+    name: 'speedup',
+    description: 'Double the playback speed of an attached video.',
+    category: 'Media Effects',
+    aliases: ['fast'],
+    async execute(message, args, client) {
+      return runSpeedup(message, 2.0);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runSpeedup(interaction, 2.0);
+    }
+  },
+  {
+    name: 'slowmotion',
+    description: 'Slow down an attached video to half speed.',
+    category: 'Media Effects',
+    aliases: ['slowmo'],
+    async execute(message, args, client) {
+      return runSpeedup(message, 0.5);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runSpeedup(interaction, 0.5);
+    }
+  },
+  {
+    name: 'mutevideo',
+    description: 'Remove all audio tracks from an attached video.',
+    category: 'Media Effects',
+    aliases: ['stripaudio'],
+    async execute(message, args, client) {
+      return runMuteVideo(message);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runMuteVideo(interaction);
+    }
   }
 ];
 
@@ -305,6 +370,72 @@ async function runGreenscreen(ctx, bgUrl) {
   } finally {
     if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
     if (fs.existsSync(bgPath)) fs.unlinkSync(bgPath);
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+  }
+}
+
+// Helper: Video speedup / slowdown
+async function runSpeedup(ctx, speed) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach a video file to change speed.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.mp4';
+  const inputPath = path.join(TMP_DIR, `speed_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `speed_out_${Date.now()}${ext}`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+    
+    // speed modification filters (setpts for video, atempo for audio)
+    const setptsVal = (1.0 / speed).toFixed(2);
+    let filter = `-vf "setpts=${setptsVal}*PTS"`;
+    
+    if (speed === 2.0) {
+      filter += ` -af "atempo=2.0"`;
+    } else if (speed === 0.5) {
+      filter += ` -af "atempo=0.5"`;
+    }
+
+    const cmd = `ffmpeg -y -i "${inputPath}" ${filter} "${outputPath}"`;
+    await executeShell(cmd);
+
+    const file = new AttachmentBuilder(outputPath, { name: `speed_${speed}x${ext}` });
+    await respond(ctx, { files: [file] });
+  } catch (err) {
+    console.error('[Video Speed Error]:', err.message);
+    await respond(ctx, { content: 'Failed to adjust video speed.' });
+  } finally {
+    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+  }
+}
+
+// Helper: Mute video
+async function runMuteVideo(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach a video file to mute.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.mp4';
+  const inputPath = path.join(TMP_DIR, `mute_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `mute_out_${Date.now()}${ext}`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+    
+    const cmd = `ffmpeg -y -i "${inputPath}" -an -vcodec copy "${outputPath}"`;
+    await executeShell(cmd);
+
+    const file = new AttachmentBuilder(outputPath, { name: `muted_video${ext}` });
+    await respond(ctx, { files: [file] });
+  } catch (err) {
+    console.error('[Video Mute Error]:', err.message);
+    await respond(ctx, { content: 'Failed to mute video file.' });
+  } finally {
+    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
     if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
   }
 }

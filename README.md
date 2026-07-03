@@ -131,6 +131,11 @@ npm run dev
 - `.removebg` - Split white background pixels out of an image.
 - `.cut <start_time> <duration>` - Cut segments without re-encoding.
 - `.vredit` - Map flat media side-by-side into stereoscopic double-circular lenses.
+- `.grayscale` - Convert image or video to black and white.
+- `.invert` - Invert color spectrum of attached image or video.
+- `.speedup` - Doubles playback speed of attached video (2x).
+- `.slowmotion` - Slows down playback speed of video to half speed (0.5x).
+- `.mutevideo` - Removes audio streams entirely from video.
 
 ### 📜 Extended Quotes
 - `.createquote <author> | <text>` - Commit quotes to local JSON database.
