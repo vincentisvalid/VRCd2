@@ -6,7 +6,7 @@ import { AttachmentBuilder } from 'discord.js';
 import { respond, buildEmbed, downloadFile } from '../utils/helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(__filename);
 const TMP_DIR = path.join(__dirname, '../../tmp');
 
 if (!fs.existsSync(TMP_DIR)) {
@@ -27,90 +27,92 @@ export default [
   },
   {
     name: 'valentine',
-    description: 'Apply a sweet pinkish Valentine overlay filter.',
+    description: 'Generates an animated heart opening GIF from any image.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "hue=h=330:s=1.5:b=1.2"', 'valentine');
+      return runValentineGif(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "hue=h=330:s=1.5:b=1.2"', 'valentine');
+      return runValentineGif(interaction);
     }
   },
   {
     name: 'rainbow',
-    description: 'Add a colorful rainbow color-cycling overlay to media.',
+    description: 'Apply an animated cycling rainbow RGB gradient overlay.',
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "hue=h=t*60:s=1.5"', 'rainbow');
+      return runRainbowEffect(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "hue=h=t*60:s=1.5"', 'rainbow');
+      return runRainbowEffect(interaction);
     }
   },
   {
     name: 'blur',
-    description: 'Apply box blur with adjustable strength parameters.',
+    description: 'Apply Gaussian blur with adjustable strength parameters.',
     category: 'Media Effects',
     options: [
-      { name: 'strength', type: 10, description: 'Blur radius (default 5)', required: false },
+      { name: 'strength', type: 10, description: 'Blur strength (1-20, default 5)', required: false },
       { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
     ],
     async execute(message, args) {
       const strength = args[0] ? parseFloat(args[0]) : 5;
-      return runFFmpegCommand(message, `-vf "boxblur=luma_radius=${strength}:luma_power=1"`, 'blur');
+      return runFFmpegCommand(message, `-vf "gblur=sigma=${strength}"`, 'blur');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
       const strength = interaction.options.getNumber('strength') || 5;
-      return runFFmpegCommand(interaction, `-vf "boxblur=luma_radius=${strength}:luma_power=1"`, 'blur');
+      return runFFmpegCommand(interaction, `-vf "gblur=sigma=${strength}"`, 'blur');
     }
   },
   {
     name: 'toaster',
-    description: 'Apply vintage toaster color grading with vignette filter.',
+    description: 'Apply high-quality vintage warm toaster color grading.',
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "colorbalance=rs=0.15:gs=0.05:bs=-0.1,vignette=0.3"', 'toaster');
+      return runFFmpegCommand(message, '-vf "curves=preset=vintage,colorbalance=rs=0.15:gs=0.05:bs=-0.1,vignette=0.2"', 'toaster');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "colorbalance=rs=0.15:gs=0.05:bs=-0.1,vignette=0.3"', 'toaster');
+      return runFFmpegCommand(interaction, '-vf "curves=preset=vintage,colorbalance=rs=0.15:gs=0.05:bs=-0.1,vignette=0.2"', 'toaster');
     }
   },
   {
     name: 'speechbubble',
-    description: 'Overlay a blank speech bubble header on top of the image.',
+    description: 'Overlay a transparent speech bubble cutout at the top of the image.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "drawbox=y=0:h=ih*0.18:color=white:t=fill"', 'speechbubble');
+      return runSpeechBubble(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "drawbox=y=0:h=ih*0.18:color=white:t=fill"', 'speechbubble');
+      return runSpeechBubble(interaction);
     }
   },
   {
     name: 'motivate',
-    description: 'Generate a classic motivational poster style frame.',
+    description: 'Generate a classic motivational poster style frame with text.',
     category: 'Media Effects',
     options: [
       { name: 'top', type: 3, description: 'Top heading text', required: true },
       { name: 'bottom', type: 3, description: 'Bottom sub-heading text', required: true },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
+      { name: 'url', type: 3, description: 'Image URL or attachment', required: false }
     ],
     async execute(message, args) {
       if (args.length < 2) return respond(message, { content: 'Usage: `.motivate "top text" "bottom text"`' });
-      return runFFmpegCommand(message, `-vf "pad=iw+80:ih+120:40:40:black"`, 'motivate');
+      return runMotivate(message, args[0], args[1]);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, `-vf "pad=iw+80:ih+120:40:40:black"`, 'motivate');
+      const top = interaction.options.getString('top');
+      const bottom = interaction.options.getString('bottom');
+      return runMotivate(interaction, top, bottom);
     }
   },
   {
@@ -119,11 +121,11 @@ export default [
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "scale=120:120,scale=iw*4:ih*4:flags=neighbor"', 'rubiks');
+      return runFFmpegCommand(message, '-vf "scale=120:120,scale=600:600:flags=neighbor,drawgrid=w=60:h=60:t=2:c=black"', 'rubiks');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=120:120,scale=iw*4:ih*4:flags=neighbor"', 'rubiks');
+      return runFFmpegCommand(interaction, '-vf "scale=120:120,scale=600:600:flags=neighbor,drawgrid=w=60:h=60:t=2:c=black"', 'rubiks');
     }
   },
   {
@@ -132,67 +134,63 @@ export default [
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "rotate=2*PI*t:fillcolor=black"', 'spin');
+      return runSpinEffect(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "rotate=2*PI*t:fillcolor=black"', 'spin');
+      return runSpinEffect(interaction);
     }
   },
   {
     name: 'bloom',
-    description: 'Apply soft bloom lighting contrast overlay.',
+    description: 'Apply high-end soft bloom lighting contrast overlay.',
     category: 'Media Effects',
-    options: [
-      { name: 'radius', type: 10, description: 'Bloom radius', required: false },
-      { name: 'brightness', type: 10, description: 'Brightness level', required: false },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
-    ],
+    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "unsharp=5:5:1.0:5:5:0.0,contrast=1.3"', 'bloom');
+      return runFFmpegCommand(message, '-filter_complex "[0:v]split[orig][glow];[glow]threshold=180,boxblur=15:15[blurred];[orig][blurred]blend=all_mode=screen:all_opacity=0.6"', 'bloom');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "unsharp=5:5:1.0:5:5:0.0,contrast=1.3"', 'bloom');
+      return runFFmpegCommand(interaction, '-filter_complex "[0:v]split[orig][glow];[glow]threshold=180,boxblur=15:15[blurred];[orig][blurred]blend=all_mode=screen:all_opacity=0.6"', 'bloom');
     }
   },
   {
     name: 'fortune',
     description: 'Render media nested inside a fortune template frame.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "vignette=0.4"', 'fortune');
+      return runFortuneFrame(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "vignette=0.4"', 'fortune');
+      return runFortuneFrame(interaction);
     }
   },
   {
     name: 'deepfry',
-    description: 'Meme style deepfry: high contrast and saturation boost.',
+    description: 'Meme style deepfry: high contrast and saturation boost with JPEG artifacts.',
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "contrast=2.0:brightness=0.08:saturation=3.0,noise=alls=8"', 'deepfry');
+      return runFFmpegCommand(message, '-vf "eq=contrast=3.0:saturation=5.0:brightness=-0.05,unsharp=5:5:5.0:5:5:5.0" -q:v 1', 'deepfry');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "contrast=2.0:brightness=0.08:saturation=3.0,noise=alls=8"', 'deepfry');
+      return runFFmpegCommand(interaction, '-vf "eq=contrast=3.0:saturation=5.0:brightness=-0.05,unsharp=5:5:5.0:5:5:5.0" -q:v 1', 'deepfry');
     }
   },
   {
     name: 'flag',
     description: 'Overlay standard flag color maps over media.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "hue=h=180:s=0.5"', 'flag');
+      return runFlagOverlay(message, false);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "hue=h=180:s=0.5"', 'flag');
+      return runFlagOverlay(interaction, false);
     }
   },
   {
@@ -215,27 +213,30 @@ export default [
     options: [
       { name: 'top', type: 3, description: 'Top text', required: true },
       { name: 'bottom', type: 3, description: 'Bottom text', required: true },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
+      { name: 'url', type: 3, description: 'Image URL or attachment', required: false }
     ],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "vignette=0.1"', 'meme');
+      if (args.length < 2) return respond(message, { content: 'Usage: `.meme "top text" "bottom text"`' });
+      return runMemeText(message, args[0], args[1]);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "vignette=0.1"', 'meme');
+      const top = interaction.options.getString('top');
+      const bottom = interaction.options.getString('bottom');
+      return runMemeText(interaction, top, bottom);
     }
   },
   {
     name: 'flag2',
-    description: 'Apply alternate flag color maps.',
+    description: 'Apply alternate flag color maps (Pride stripes).',
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "hue=h=90:s=0.7"', 'flag2');
+      return runFlagOverlay(message, true);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "hue=h=90:s=0.7"', 'flag2');
+      return runFlagOverlay(interaction, true);
     }
   },
   {
@@ -244,27 +245,29 @@ export default [
     category: 'Media Effects',
     options: [
       { name: 'text', type: 3, description: 'Label text', required: true },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
+      { name: 'url', type: 3, description: 'Image URL or attachment', required: false }
     ],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "vignette=0.2"', 'heart');
+      if (args.length === 0) return respond(message, { content: 'Usage: `.heart <text>`' });
+      return runHeartBorder(message, args.join(' '));
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "vignette=0.2"', 'heart');
+      const text = interaction.options.getString('text');
+      return runHeartBorder(interaction, text);
     }
   },
   {
     name: 'magik',
-    description: 'Warp and liquid distort image maps.',
+    description: 'Warp and liquid distort image maps (content-aware style wave).',
     category: 'Media Effects',
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.45:k2=-0.45"', 'magik');
+      return runFFmpegCommand(message, `-vf "geq=r='r(X+15*sin(2*PI*Y/100),Y)':g='g(X+15*sin(2*PI*Y/100),Y)':b='b(X+15*sin(2*PI*Y/100),Y)'"`, 'magik');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.45:k2=-0.45"', 'magik');
+      return runFFmpegCommand(interaction, `-vf "geq=r='r(X+15*sin(2*PI*Y/100),Y)':g='g(X+15*sin(2*PI*Y/100),Y)':b='b(X+15*sin(2*PI*Y/100),Y)'"`, 'magik');
     }
   },
   {
@@ -273,14 +276,16 @@ export default [
     category: 'Media Effects',
     options: [
       { name: 'text', type: 3, description: 'Caption label', required: true },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
+      { name: 'url', type: 3, description: 'Image URL or attachment', required: false }
     ],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "drawbox=y=0:h=ih*0.2:color=white:t=fill"', 'caption');
+      if (args.length === 0) return respond(message, { content: 'Usage: `.caption <text>`' });
+      return runCaptionText(message, args.join(' '));
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "drawbox=y=0:h=ih*0.2:color=white:t=fill"', 'caption');
+      const text = interaction.options.getString('text');
+      return runCaptionText(interaction, text);
     }
   },
   {
@@ -300,45 +305,39 @@ export default [
     name: 'spread',
     description: 'Scatters and spreads pixels randomly.',
     category: 'Media Effects',
-    options: [
-      { name: 'strength', type: 10, description: 'Spread factor strength', required: false },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
-    ],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "noise=alls=15:allf=t+u"', 'spread');
+      return runSpreadEffect(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "noise=alls=15:allf=t+u"', 'spread');
+      return runSpreadEffect(interaction);
     }
   },
   {
     name: 'swirl',
     description: 'Apply twirl vortex rotation.',
     category: 'Media Effects',
-    options: [
-      { name: 'strength', type: 10, description: 'Vortex strength', required: false },
-      { name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }
-    ],
+    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.3:k2=-0.3"', 'swirl');
+      return runFFmpegCommand(message, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.6:k2=0.2"', 'swirl');
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.3:k2=-0.3"', 'swirl');
+      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.6:k2=0.2"', 'swirl');
     }
   },
   {
     name: 'book',
     description: 'Render inside an opened book template grid.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "boxblur=1:1"', 'book');
+      return runBookOverlay(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "boxblur=1:1"', 'book');
+      return runBookOverlay(interaction);
     }
   },
   {
@@ -358,13 +357,13 @@ export default [
     name: 'billboard',
     description: 'Project media maps onto outdoor billboards templates.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "boxblur=2:1,scale=640:-1"', 'billboard');
+      return runBillboardFrame(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "boxblur=2:1,scale=640:-1"', 'billboard');
+      return runBillboardFrame(interaction);
     }
   },
   {
@@ -382,15 +381,15 @@ export default [
   },
   {
     name: 'tattoo',
-    description: 'Superimpose image as skin tattoos.',
+    description: 'Superimpose image as skin tattoos using blend multiply overlays.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "colorbalance=rs=-0.1:gs=-0.1:bs=-0.1"', 'tattoo');
+      return runTattooEffect(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "colorbalance=rs=-0.1:gs=-0.1:bs=-0.1"', 'tattoo');
+      return runTattooEffect(interaction);
     }
   },
   {
@@ -446,32 +445,6 @@ export default [
     }
   },
   {
-    name: 'scramble',
-    description: 'Scramble media layout locations.',
-    category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
-    async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "noise=alls=30:allf=t+u"', 'scramble');
-    },
-    async executeSlash(interaction) {
-      await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "noise=alls=30:allf=t+u"', 'scramble');
-    }
-  },
-  {
-    name: 'reverse',
-    description: 'Reverse video playback frames.',
-    category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
-    async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "hflip"', 'reversed');
-    },
-    async executeSlash(interaction) {
-      await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "hflip"', 'reversed');
-    }
-  },
-  {
     name: 'zoom',
     description: 'Zooms and crops center region scales.',
     category: 'Media Effects',
@@ -504,28 +477,29 @@ export default [
   },
   {
     name: 'zoomblur',
-    description: 'Generate zoom radial blurs.',
+    description: 'Generate high-quality radial zoom motion blur overlays.',
     category: 'Media Effects',
-    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args) {
-      return runFFmpegCommand(message, '-vf "boxblur=10:2"', 'zoomblur');
+      return runZoomBlur(message);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "boxblur=10:2"', 'zoomblur');
+      return runZoomBlur(interaction);
     }
   },
   {
     name: 'glitch',
-    description: 'Apply blocky color glitch filter to an image or video.',
+    description: 'Apply digital channel split and block shift glitches.',
     category: 'Media Effects',
     aliases: ['corrupt'],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args, client) {
-      return runFFmpegCommand(message, '-vf "scale=iw/8:-1,scale=iw*8:-1:flags=neighbor,hue=h=120:s=3:b=1.5"', 'glitched');
+      return runGlitchEffect(message);
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=iw/8:-1,scale=iw*8:-1:flags=neighbor,hue=h=120:s=3:b=1.5"', 'glitched');
+      return runGlitchEffect(interaction);
     }
   },
   {
@@ -533,6 +507,7 @@ export default [
     description: 'Convert an attached image into Monospace ASCII Art.',
     category: 'Media Effects',
     aliases: ['textart'],
+    options: [{ name: 'url', type: 3, description: 'Image URL or attachment', required: false }],
     async execute(message, args, client) {
       return runAsciiCommand(message);
     },
@@ -546,6 +521,7 @@ export default [
     description: 'Apply retro VHS noise and tape bleed simulation to media.',
     category: 'Media Effects',
     aliases: ['retro'],
+    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args, client) {
       return runFFmpegCommand(message, '-vf "colorbalance=rs=0.15:gs=-0.05:bs=-0.1,boxblur=1:1,noise=alls=15:allf=t+u,scale=720:576"', 'vhs');
     },
@@ -584,6 +560,7 @@ export default [
     description: 'Remove background by keying out white background pixels.',
     category: 'Media Effects',
     aliases: ['nobg'],
+    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args, client) {
       return runFFmpegCommand(message, '-vf "colorkey=0xFFFFFF:0.1:0.1,format=rgba"', 'nobg', '.png');
     },
@@ -629,8 +606,9 @@ export default [
     description: 'Apply Side-By-Side dual circular barrel VR filter.',
     category: 'Media Effects',
     aliases: ['vrfilter'],
+    options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args, client) {
-      return runFFmpegCommand(message, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];movie=\\\'/dev/stdin\\\'[in];[in]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r];[l][r]hstack"', 'vr_lens');
+      return runFFmpegCommand(message, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];movie=\'/dev/stdin\'[in];[in]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r];[l][r]hstack"', 'vr_lens');
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
@@ -641,10 +619,10 @@ export default [
 
 function runMediaHelp(ctx) {
   const fields = [
-    { name: 'Filters', value: '`.valentine`, `.rainbow`, `.blur`, `.toaster`, `.speechbubble`, `.bloom`, `.deepfry`, `.magik`, `.pixelate`, `.fisheye`, `.neon`, `.grayscale`, `.invert`, `.scramble`, `.zoomblur`' },
+    { name: 'Filters', value: '`.valentine`, `.rainbow`, `.blur`, `.toaster`, `.speechbubble`, `.bloom`, `.deepfry`, `.magik`, `.pixelate`, `.fisheye`, `.neon`, `.grayscale`, `.invert`, `.zoomblur`' },
     { name: 'Generators & Memes', value: '`.motivate`, `.fortune`, `.meme`, `.heart`, `.caption`, `.billboard`, `.tattoo`' },
     { name: 'Distortions & Warps', value: '`.rubiks`, `.spin`, `.circuitboard`, `.spread`, `.swirl`, `.book`, `.wormhole`' },
-    { name: 'Video Operations', value: '`.reverse`, `.zoom`, `.speed`, `.greenscreen`, `.removebg`, `.cut`, `.vredit`, `.ascii`' }
+    { name: 'Video Operations', value: '`.zoom`, `.speed`, `.greenscreen`, `.removebg`, `.cut`, `.vredit`, `.ascii`' }
   ];
   return respond(ctx, { embeds: [buildEmbed('🎬 VRCd2 Media Processing Engine', 'Select from the following FFmpeg filter presets:', fields, 0x1fc2c2)] });
 }
@@ -843,4 +821,1041 @@ function executeShell(cmd) {
       else resolve({ stdout, stderr });
     });
   });
+}
+
+// ---------------------------------------------------------
+// CUSTOM PREMIUM ANIMATIONS & OVERLAYS (CANVAS & FFmpeg)
+// ---------------------------------------------------------
+
+async function runValentineGif(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the valentine GIF.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `val_in_${Date.now()}${ext}`);
+  const frameDir = path.join(TMP_DIR, `val_frames_${Date.now()}`);
+  const outputPath = path.join(TMP_DIR, `val_out_${Date.now()}.gif`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+    fs.mkdirSync(frameDir);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = 400;
+    const h = Math.round((img.height / img.width) * w);
+    const totalFrames = 15;
+
+    for (let i = 0; i < totalFrames; i++) {
+      const canvas = createCanvas(w, h);
+      const g = canvas.getContext('2d');
+
+      g.fillStyle = '#ff6b8b';
+      g.fillRect(0, 0, w, h);
+
+      const t = i / (totalFrames - 1);
+      const maxHeartSize = Math.sqrt(w * w + h * h);
+      const size = t * maxHeartSize;
+
+      g.save();
+      if (size > 5) {
+        g.beginPath();
+        drawHeartInCenter(g, w / 2, h / 2, size);
+        g.clip();
+      } else {
+        g.beginPath();
+        g.rect(0, 0, 0, 0);
+        g.clip();
+      }
+
+      g.drawImage(img, 0, 0, w, h);
+      g.restore();
+
+      const framePath = path.join(frameDir, `frame_${String(i).padStart(3, '0')}.png`);
+      fs.writeFileSync(framePath, canvas.toBuffer('image/png'));
+    }
+
+    const cmd = `ffmpeg -y -framerate 12 -i "${frameDir}/frame_%03d.png" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" "${outputPath}"`;
+    await executeShell(cmd);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'valentine.gif' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Valentine GIF Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate Valentine heart opening GIF.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      if (fs.existsSync(frameDir)) {
+        fs.readdirSync(frameDir).forEach(f => fs.unlinkSync(path.join(frameDir, f)));
+        fs.rmdirSync(frameDir);
+      }
+    } catch (_) {}
+  }
+}
+
+function drawHeartInCenter(g, cx, cy, size) {
+  g.beginPath();
+  g.moveTo(cx, cy - size / 4);
+  g.bezierCurveTo(cx - size / 2, cy - size, cx - size, cy - size / 3, cx, cy + size * 0.7);
+  g.bezierCurveTo(cx + size, cy - size / 3, cx + size / 2, cy - size, cx, cy - size / 4);
+  g.closePath();
+}
+
+async function runRainbowEffect(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach a media file.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const isVideo = /\\.(mp4|mov|m4v|gif)$/i.test(ext);
+
+  if (isVideo) {
+    return runFFmpegCommand(ctx, '-vf "hue=h=t*120:s=1.5"', 'rainbow');
+  }
+
+  const inputPath = path.join(TMP_DIR, `rb_in_${Date.now()}${ext}`);
+  const frameDir = path.join(TMP_DIR, `rb_frames_${Date.now()}`);
+  const outputPath = path.join(TMP_DIR, `rb_out_${Date.now()}.gif`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+    fs.mkdirSync(frameDir);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = 400;
+    const h = Math.round((img.height / img.width) * w);
+    const totalFrames = 12;
+
+    for (let i = 0; i < totalFrames; i++) {
+      const canvas = createCanvas(w, h);
+      const g = canvas.getContext('2d');
+
+      g.drawImage(img, 0, 0, w, h);
+
+      const hue = (i / totalFrames) * 360;
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = `hsla(${hue}, 100%, 50%, 0.35)`;
+      g.fillRect(0, 0, w, h);
+
+      const framePath = path.join(frameDir, `frame_${String(i).padStart(3, '0')}.png`);
+      fs.writeFileSync(framePath, canvas.toBuffer('image/png'));
+    }
+
+    const cmd = `ffmpeg -y -framerate 10 -i "${frameDir}/frame_%03d.png" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" "${outputPath}"`;
+    await executeShell(cmd);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'rainbow.gif' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Rainbow GIF Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate cycling rainbow GIF.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      if (fs.existsSync(frameDir)) {
+        fs.readdirSync(frameDir).forEach(f => fs.unlinkSync(path.join(frameDir, f)));
+        fs.rmdirSync(frameDir);
+      }
+    } catch (_) {}
+  }
+}
+
+async function runSpeechBubble(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the speech bubble.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `sb_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `sb_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+    const headerHeight = Math.max(60, Math.round(h * 0.15));
+
+    const canvas = createCanvas(w, h + headerHeight);
+    const g = canvas.getContext('2d');
+
+    g.drawImage(img, 0, headerHeight, w, h);
+
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, w, headerHeight);
+
+    g.globalCompositeOperation = 'destination-out';
+    g.beginPath();
+    
+    const cx = w / 2;
+    const cy = headerHeight * 0.55;
+    const rx = w * 0.42;
+    const ry = headerHeight * 0.38;
+    g.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+    g.fill();
+
+    g.beginPath();
+    g.moveTo(cx - 20, 0);
+    g.lineTo(cx + 20, 0);
+    g.lineTo(cx - 5, headerHeight * 0.65);
+    g.closePath();
+    g.fill();
+
+    g.globalCompositeOperation = 'source-over';
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'speechbubble.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Speechbubble Error]:', err.message);
+    await respond(ctx, { content: 'Failed to apply speechbubble cutout overlay.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runMotivate(ctx, topText, bottomText) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the motivational poster.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `mot_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `mot_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const borderW = 80;
+    const borderH = 150;
+    const w = img.width + borderW;
+    const h = img.height + borderH;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    // Draw black background
+    g.fillStyle = '#000000';
+    g.fillRect(0, 0, w, h);
+
+    // Draw inner white frame box
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 3;
+    g.strokeRect(borderW / 2 - 5, borderW / 2 - 5, img.width + 10, img.height + 10);
+
+    // Draw original image
+    g.drawImage(img, borderW / 2, borderW / 2, img.width, img.height);
+
+    // Render texts
+    g.fillStyle = '#ffffff';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+
+    // Top Header
+    g.font = `bold ${Math.max(22, Math.round(w * 0.045))}px Georgia, serif`;
+    g.fillText(topText.toUpperCase(), w / 2, h - 90);
+
+    // Bottom Subtext
+    g.font = `italic ${Math.max(14, Math.round(w * 0.024))}px Georgia, serif`;
+    g.fillText(bottomText, w / 2, h - 45);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'motivational.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Motivate Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate motivational poster.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runSpinEffect(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach a media file.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const isVideo = /\\.(mp4|mov|m4v|gif)$/i.test(ext);
+
+  if (isVideo) {
+    return runFFmpegCommand(ctx, '-vf "rotate=2*PI*t:fillcolor=black"', 'spin');
+  }
+
+  const inputPath = path.join(TMP_DIR, `spin_in_${Date.now()}${ext}`);
+  const frameDir = path.join(TMP_DIR, `spin_frames_${Date.now()}`);
+  const outputPath = path.join(TMP_DIR, `spin_out_${Date.now()}.gif`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+    fs.mkdirSync(frameDir);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = 350;
+    const h = 350;
+    const totalFrames = 16;
+
+    for (let i = 0; i < totalFrames; i++) {
+      const canvas = createCanvas(w, h);
+      const g = canvas.getContext('2d');
+
+      g.fillStyle = '#000000';
+      g.fillRect(0, 0, w, h);
+
+      const angle = (i / totalFrames) * 2 * Math.PI;
+
+      g.save();
+      g.translate(w / 2, h / 2);
+      g.rotate(angle);
+      g.drawImage(img, -w / 2, -h / 2, w, h);
+      g.restore();
+
+      const framePath = path.join(frameDir, `frame_${String(i).padStart(3, '0')}.png`);
+      fs.writeFileSync(framePath, canvas.toBuffer('image/png'));
+    }
+
+    const cmd = `ffmpeg -y -framerate 14 -i "${frameDir}/frame_%03d.png" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" "${outputPath}"`;
+    await executeShell(cmd);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'spin.gif' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Spin GIF Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate spinning GIF.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      if (fs.existsSync(frameDir)) {
+        fs.readdirSync(frameDir).forEach(f => fs.unlinkSync(path.join(frameDir, f)));
+        fs.rmdirSync(frameDir);
+      }
+    } catch (_) {}
+  }
+}
+
+async function runMemeText(ctx, topText, bottomText) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the meme.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `meme_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `meme_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    g.drawImage(img, 0, 0, w, h);
+
+    // Meme Style Text settings
+    g.fillStyle = '#ffffff';
+    g.strokeStyle = '#000000';
+    g.lineWidth = Math.max(3, Math.round(w * 0.008));
+    g.textAlign = 'center';
+    
+    const fontSize = Math.max(20, Math.round(w * 0.075));
+    g.font = `bold ${fontSize}px Impact, ArialBlack, sans-serif`;
+
+    // Render Top text
+    g.textBaseline = 'top';
+    g.strokeText(topText.toUpperCase(), w / 2, 20);
+    g.fillText(topText.toUpperCase(), w / 2, 20);
+
+    // Render Bottom text
+    g.textBaseline = 'bottom';
+    g.strokeText(bottomText.toUpperCase(), w / 2, h - 20);
+    g.fillText(bottomText.toUpperCase(), w / 2, h - 20);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'meme.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Meme Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate meme text overlays.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runCaptionText(ctx, text) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to add a caption.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `cap_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `cap_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+    
+    // Draw white top header
+    const headerHeight = Math.max(50, Math.round(h * 0.16));
+    const canvas = createCanvas(w, h + headerHeight);
+    const g = canvas.getContext('2d');
+
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, w, headerHeight);
+
+    // Render Text
+    g.fillStyle = '#000000';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `bold ${Math.max(14, Math.round(w * 0.038))}px Futura, "Helvetica Neue", Arial, sans-serif`;
+    g.fillText(text, w / 2, headerHeight / 2);
+
+    // Draw Image
+    g.drawImage(img, 0, headerHeight, w, h);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'caption.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Caption Error]:', err.message);
+    await respond(ctx, { content: 'Failed to render caption.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runFortuneFrame(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the fortune card.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `for_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `for_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w + 60, h + 80);
+    const g = canvas.getContext('2d');
+
+    // Draw celestial dark gold border
+    g.fillStyle = '#1e1c24';
+    g.fillRect(0, 0, w + 60, h + 80);
+
+    g.strokeStyle = '#d4af37'; // gold
+    g.lineWidth = 6;
+    g.strokeRect(10, 10, w + 40, h + 60);
+
+    g.strokeStyle = '#d4af37';
+    g.lineWidth = 1;
+    g.strokeRect(16, 16, w + 28, h + 48);
+
+    // Draw original image centered
+    g.drawImage(img, 30, 30, w, h);
+
+    // Add stars in corners
+    g.fillStyle = '#d4af37';
+    g.font = '24px serif';
+    g.fillText('✦', 20, 26);
+    g.fillText('✦', w + 22, 26);
+    g.fillText('✦', 20, h + 46);
+    g.fillText('✦', w + 22, h + 46);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'fortune_card.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Fortune Frame Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate fortune tarot frame.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runHeartBorder(ctx, text) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the heart card.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `heart_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `heart_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    g.drawImage(img, 0, 0, w, h);
+
+    // Draw thick heart border outline overlay
+    g.strokeStyle = '#ff3366';
+    g.lineWidth = Math.max(5, Math.round(w * 0.02));
+    g.beginPath();
+    drawHeartInCenter(g, w / 2, h / 2, w * 0.85);
+    g.stroke();
+
+    // Draw text banner ribbon
+    g.fillStyle = '#ff3366';
+    const bannerH = Math.max(30, Math.round(h * 0.1));
+    g.fillRect(0, h - bannerH, w, bannerH);
+
+    g.fillStyle = '#ffffff';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `bold ${Math.max(12, Math.round(w * 0.038))}px Arial, sans-serif`;
+    g.fillText(text, w / 2, h - bannerH / 2);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'heart_frame.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Heart Border Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate heart frame.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runFlagOverlay(ctx, isPride) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to apply the flag overlay.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `flag_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `flag_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    g.drawImage(img, 0, 0, w, h);
+
+    // Overlay colors
+    g.globalAlpha = 0.4;
+    
+    if (isPride) {
+      // 6 Pride Stripes
+      const colors = ['#e40303', '#ff8c00', '#ffeb00', '#008026', '#004cff', '#732982'];
+      const stripeH = h / colors.length;
+      for (let i = 0; i < colors.length; i++) {
+        g.fillStyle = colors[i];
+        g.fillRect(0, i * stripeH, w, stripeH + 1);
+      }
+    } else {
+      // Tricolor Standard Red/White/Blue Blend
+      const colors = ['#00209f', '#ffffff', '#e40303'];
+      const stripeW = w / colors.length;
+      for (let i = 0; i < colors.length; i++) {
+        g.fillStyle = colors[i];
+        g.fillRect(i * stripeW, 0, stripeW + 1, h);
+      }
+    }
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'flag_composite.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Flag Overlay Error]:', err.message);
+    await respond(ctx, { content: 'Failed to apply flag overlay.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runSpreadEffect(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `spr_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `spr_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+    g.drawImage(img, 0, 0, w, h);
+
+    const imgData = g.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // Displace chunks of pixels randomly
+    for (let y = 0; y < h; y += 4) {
+      for (let x = 0; x < w; x += 4) {
+        if (Math.random() < 0.35) {
+          const shiftX = Math.round((Math.random() - 0.5) * 20);
+          const shiftY = Math.round((Math.random() - 0.5) * 20);
+          
+          const newX = Math.min(w - 1, Math.max(0, x + shiftX));
+          const newY = Math.min(h - 1, Math.max(0, y + shiftY));
+
+          // Swap 4x4 block
+          for (let dy = 0; dy < 4; dy++) {
+            if (y + dy >= h || newY + dy >= h) continue;
+            for (let dx = 0; dx < 4; dx++) {
+              if (x + dx >= w || newX + dx >= w) continue;
+              const sourceIdx = ((y + dy) * w + (x + dx)) * 4;
+              const destIdx = ((newY + dy) * w + (newX + dx)) * 4;
+
+              for (let c = 0; c < 4; c++) {
+                const temp = data[sourceIdx + c];
+                data[sourceIdx + c] = data[destIdx + c];
+                data[destIdx + c] = temp;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    g.putImageData(imgData, 0, 0);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'dispersed.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Spread Error]:', err.message);
+    await respond(ctx, { content: 'Failed to process pixel spread dispersion.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runBookOverlay(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `bk_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `bk_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    // Draw book pages distortion (curled spine shadow)
+    g.drawImage(img, 0, 0, w, h);
+
+    // Central spine shadow gradient
+    const grad = g.createLinearGradient(w / 2 - 40, 0, w / 2 + 40, 0);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.48, 'rgba(0,0,0,0.65)');
+    grad.addColorStop(0.5, 'rgba(0,0,0,0.85)');
+    grad.addColorStop(0.52, 'rgba(0,0,0,0.65)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+
+    // Left and right edges page curls
+    const edgeL = g.createLinearGradient(0, 0, 30, 0);
+    edgeL.addColorStop(0, 'rgba(0,0,0,0.5)');
+    edgeL.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = edgeL;
+    g.fillRect(0, 0, 30, h);
+
+    const edgeR = g.createLinearGradient(w - 30, 0, w, 0);
+    edgeR.addColorStop(0, 'rgba(0,0,0,0)');
+    edgeR.addColorStop(1, 'rgba(0,0,0,0.5)');
+    g.fillStyle = edgeR;
+    g.fillRect(w - 30, 0, 30, h);
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'book_render.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Book Error]:', err.message);
+    await respond(ctx, { content: 'Failed to render inside book frames.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runBillboardFrame(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `bill_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `bill_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = 600;
+    const h = 400;
+
+    const canvas = createCanvas(w, h + 150);
+    const g = canvas.getContext('2d');
+
+    // Sky background
+    const sky = g.createLinearGradient(0, 0, 0, h + 150);
+    sky.addColorStop(0, '#87ceeb');
+    sky.addColorStop(1, '#e0f6ff');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, w, h + 150);
+
+    // Draw steel support poles at bottom
+    g.fillStyle = '#666666';
+    g.fillRect(w / 2 - 25, h, 50, 150);
+    g.fillRect(w / 4 - 15, h, 30, 150);
+    g.fillRect(w * 3/4 - 15, h, 30, 150);
+
+    // Draw gray billboard support frame
+    g.fillStyle = '#444444';
+    g.fillRect(20, 20, w - 40, h - 20);
+
+    // Draw original image inside poster board area
+    g.drawImage(img, 40, 40, w - 80, h - 60);
+
+    // Draw spotlights at the top shining down
+    g.fillStyle = 'rgba(255,255,255,0.2)';
+    g.beginPath();
+    g.moveTo(w / 4, 0); g.lineTo(w / 4 - 50, 200); g.lineTo(w / 4 + 100, 200); g.closePath(); g.fill();
+    g.beginPath();
+    g.moveTo(w * 3/4, 0); g.lineTo(w * 3/4 - 100, 200); g.lineTo(w * 3/4 + 50, 200); g.closePath(); g.fill();
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'billboard.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Billboard Error]:', err.message);
+    await respond(ctx, { content: 'Failed to overlay billboard template.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runTattooEffect(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image to create the tattoo.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `tat_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `tat_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = 500;
+    const h = 500;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    // 1. Draw skin background texture
+    g.fillStyle = '#f3d2b9'; // base skin tone
+    g.fillRect(0, 0, w, h);
+    
+    // Add noise for pores texture
+    const pores = g.createRadialGradient(w/2, h/2, 10, w/2, h/2, w);
+    pores.addColorStop(0, '#f9dfcc');
+    pores.addColorStop(1, '#e3be9f');
+    g.fillStyle = pores;
+    g.fillRect(0, 0, w, h);
+
+    // 2. Overlay tattoo image using MULTIPLY blend mode
+    g.save();
+    g.globalCompositeOperation = 'multiply';
+    g.globalAlpha = 0.85;
+    g.drawImage(img, 50, 50, w - 100, h - 100);
+    g.restore();
+
+    // 3. Add soft skin-bleed blur filter
+    g.save();
+    g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = 0.08;
+    g.drawImage(canvas, 1, 1);
+    g.restore();
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'tattoo.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Tattoo Error]:', err.message);
+    await respond(ctx, { content: 'Failed to overlay tattoo skin textures.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runZoomBlur(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `zb_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `zb_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    g.drawImage(img, 0, 0, w, h);
+
+    // Draw 12 concentric zoomed overlays with fading opacity
+    g.globalAlpha = 0.07;
+    for (let i = 1; i <= 12; i++) {
+      const scale = 1.0 + (i * 0.015);
+      const nw = w * scale;
+      const nh = h * scale;
+      const dx = (w - nw) / 2;
+      const dy = (h - nh) / 2;
+      g.drawImage(img, dx, dy, nw, nh);
+    }
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'radial_blur.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Zoom Blur Error]:', err.message);
+    await respond(ctx, { content: 'Failed to apply radial zoom blur.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
+}
+
+async function runGlitchEffect(ctx) {
+  const attachment = getAttachment(ctx);
+  if (!attachment) {
+    return respond(ctx, { content: 'Please attach an image.' });
+  }
+
+  const ext = path.extname(attachment.name) || '.png';
+  const inputPath = path.join(TMP_DIR, `gl_in_${Date.now()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `gl_out_${Date.now()}.png`);
+
+  try {
+    await downloadFile(attachment.url, inputPath);
+
+    const { createCanvas, loadImage } = await import('canvas');
+    const img = await loadImage(inputPath);
+
+    const w = img.width;
+    const h = img.height;
+
+    const canvas = createCanvas(w, h);
+    const g = canvas.getContext('2d');
+
+    // Draw normal image
+    g.drawImage(img, 0, 0, w, h);
+
+    // Chromatic Aberration channel shifts
+    g.save();
+    g.globalCompositeOperation = 'screen';
+    g.globalAlpha = 0.55;
+    
+    // Cyan shift
+    g.fillStyle = '#00ffff';
+    g.fillRect(0, 0, w, h);
+    g.drawImage(img, -10, 0, w, h);
+
+    // Magenta shift
+    g.fillStyle = '#ff00ff';
+    g.fillRect(0, 0, w, h);
+    g.drawImage(img, 10, 0, w, h);
+    g.restore();
+
+    // Slice horizontal strips and translate them left/right
+    for (let i = 0; i < 8; i++) {
+      const sy = Math.floor(Math.random() * (h - 40));
+      const sh = Math.max(10, Math.floor(Math.random() * 45));
+      const shift = Math.round((Math.random() - 0.5) * 35);
+      g.drawImage(canvas, 0, sy, w, sh, shift, sy, w, sh);
+    }
+
+    // Add green scanner line overlays
+    g.fillStyle = 'rgba(0, 255, 0, 0.1)';
+    for (let y = 0; y < h; y += 4) {
+      g.fillRect(0, y, w, 1);
+    }
+
+    const buffer = canvas.toBuffer('image/png');
+    fs.writeFileSync(outputPath, buffer);
+
+    const file = new AttachmentBuilder(outputPath, { name: 'glitched.png' });
+    await respond(ctx, { files: [file] });
+
+  } catch (err) {
+    console.error('[Glitch Error]:', err.message);
+    await respond(ctx, { content: 'Failed to generate digital glitch art.' });
+  } finally {
+    try {
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
 }
