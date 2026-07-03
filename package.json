@@ -1,0 +1,37 @@
+{
+  "name": "vrcd-bot",
+  "version": "1.0.0",
+  "description": "VRCd Bot — a production-grade, modular, all-in-one Discord bot framework for VR communities. Hybrid prefix + slash commands, FFmpeg media effects engine, Ollama AI subsystem, voice playback, moderation suite, and more.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "check": "node --experimental-vm-modules scripts/syntax-check.js"
+  },
+  "keywords": [
+    "discord",
+    "discord-bot",
+    "discord.js",
+    "vr",
+    "ffmpeg",
+    "ollama",
+    "music-bot",
+    "moderation"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@discordjs/voice": "^0.18.0",
+    "axios": "^1.7.9",
+    "canvas": "^3.1.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "fluent-ffmpeg": "^2.1.3",
+    "libsodium-wrappers": "^0.7.15",
+    "qrcode": "^1.5.4",
+    "yt-dlp-wrap": "^2.3.12"
+  }
+}

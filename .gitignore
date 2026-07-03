@@ -1,0 +1,35 @@
+# ── Dependencies ─────────────────────────────────────────────
+node_modules/
+package-lock.json
+
+# ── Secrets & credentials ───────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Local databases (JSON key-value store lives here) ───────
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.nedb
+
+# ── Temporary media processing buffers ───────────────────────
+tmp/
+/tmp/
+*.tmp
+
+# ── Downloaded runtime binaries (yt-dlp) ─────────────────────
+bin/
+
+# ── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ── OS / editor noise ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

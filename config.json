@@ -1,0 +1,51 @@
+{
+  "bot": {
+    "defaultPrefix": ".",
+    "ownerIds": [],
+    "devGuildId": "",
+    "presence": {
+      "status": "online",
+      "activity": "VR worlds • .help"
+    },
+    "embedColor": "#8A2BE2",
+    "errorColor": "#ED4245",
+    "successColor": "#57F287",
+    "brandName": "VRCd Bot"
+  },
+  "adminUtils": {
+    "allowedRoleIds": [
+      "1520892811736514731",
+      "1517418461779722300"
+    ]
+  },
+  "ai": {
+    "ollamaBaseUrl": "http://127.0.0.1:11434",
+    "defaultModel": "llama3",
+    "xipraModel": "llama3",
+    "requestTimeoutMs": 120000
+  },
+  "fal": {
+    "text2imgModel": "fal-ai/flux/dev",
+    "text2vidModel": "fal-ai/ltx-video",
+    "editImageModel": "fal-ai/gpt-images-v2/edit",
+    "requestTimeoutMs": 300000
+  },
+  "media": {
+    "tmpDir": "tmp",
+    "maxDownloadBytes": 104857600,
+    "maxUploadBytes": 9800000,
+    "ffmpegTimeoutMs": 300000
+  },
+  "moderation": {
+    "jailRoleName": "Jailed",
+    "prisonChannelName": "prison",
+    "maxTimeoutMs": 2419200000
+  },
+  "voice": {
+    "ytdlpBinaryDir": "bin",
+    "idleDisconnectMs": 300000
+  },
+  "database": {
+    "directory": "data"
+  }
+}
