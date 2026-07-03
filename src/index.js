@@ -7,7 +7,7 @@ import {
   Routes 
 } from 'discord.js';
 import dotenv from 'dotenv';
-import config from '../config.json' assert { type: 'json' };
+import config from '../config.json' with { type: 'json' };
 import { db } from './database/db.js';
 
 // Load environment variables

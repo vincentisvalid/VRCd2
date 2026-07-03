@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { sha512, respond, deleteTrigger, buildEmbed } from '../utils/helpers.js';
-import config from '../../config.json' assert { type: 'json' };
+import config from '../../config.json' with { type: 'json' };
 
 export default [
   {

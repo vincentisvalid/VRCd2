@@ -2,7 +2,7 @@ import { ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilde
 import axios from 'axios';
 import { db } from '../database/db.js';
 import { respond, buildEmbed } from '../utils/helpers.js';
-import config from '../../config.json' assert { type: 'json' };
+import config from '../../config.json' with { type: 'json' };
 
 export default [
   {

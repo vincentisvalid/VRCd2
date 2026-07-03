@@ -1,5 +1,5 @@
 import { respond, buildEmbed } from '../utils/helpers.js';
-import config from '../../config.json' assert { type: 'json' };
+import config from '../../config.json' with { type: 'json' };
 
 const ALLOWED_ADMIN_ROLES = config.allowedAdminRoles || [
   "1520892811736514731",
