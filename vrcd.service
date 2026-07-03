@@ -1,13 +1,14 @@
 [Unit]
 Description=VRCd2 Discord Bot Service
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=vincentc
 WorkingDirectory=/home/vincentc/Projects/VRCd2
 ExecStart=/usr/bin/npm start
-Restart=on-failure
+Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
 
