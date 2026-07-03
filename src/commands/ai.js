@@ -259,7 +259,7 @@ Keep your answers engaging, informative, and technical but easy to understand.`;
 async function runFalVideo(ctx, apikey, prompt) {
   const hashedKey = sha512(apikey);
   const statusEmbed = buildEmbed(
-    'Fal.ai Video Gen',
+    'Fal.ai Video Gen (LTX-2.3 Fast)',
     `Key Hashed: ||${hashedKey.slice(0, 12)}...${hashedKey.slice(-12)}||\nStarting generation pipeline...`
   );
   
@@ -267,7 +267,7 @@ async function runFalVideo(ctx, apikey, prompt) {
 
   try {
     const response = await axios.post(
-      'https://queue.fal.run/fal-ai/stable-video-diffusion', 
+      'https://queue.fal.run/fal-ai/ltx-2.3/text-to-video/fast', 
       { prompt },
       {
         headers: {
@@ -283,9 +283,9 @@ async function runFalVideo(ctx, apikey, prompt) {
     let videoUrl = null;
     let attempts = 0;
     
-    while (!videoUrl && attempts < 20) {
+    while (!videoUrl && attempts < 25) {
       await new Promise(r => setTimeout(r, 4000));
-      const statusRes = await axios.get(`https://queue.fal.run/fal-ai/stable-video-diffusion/requests/${request_id}`, {
+      const statusRes = await axios.get(`https://queue.fal.run/fal-ai/ltx-2.3/text-to-video/fast/requests/${request_id}`, {
         headers: { 'Authorization': `Key ${apikey}` }
       });
       
@@ -303,7 +303,7 @@ async function runFalVideo(ctx, apikey, prompt) {
     }
 
     const successEmbed = buildEmbed(
-      'Fal.ai Video Generated Successfully',
+      'Fal.ai Video Generated Successfully (LTX-2.3)',
       `Prompt: *${prompt}*\n[Download Video Link](${videoUrl})`,
       [],
       0x00ff00
@@ -319,14 +319,14 @@ async function runFalVideo(ctx, apikey, prompt) {
 async function runFalImage(ctx, apikey, prompt) {
   const hashedKey = sha512(apikey);
   const statusEmbed = buildEmbed(
-    'Fal.ai Image Gen',
+    'Fal.ai Image Gen (FLUX.1 schnell)',
     `Key Hashed: ||${hashedKey.slice(0, 12)}...${hashedKey.slice(-12)}||\nStarting generation pipeline...`
   );
   await respond(ctx, { embeds: [statusEmbed] });
 
   try {
     const res = await axios.post(
-      'https://queue.fal.run/fal-ai/fast-sdxl', 
+      'https://queue.fal.run/fal-ai/flux-1/schnell', 
       { prompt, sync_mode: true },
       {
         headers: {
@@ -343,7 +343,7 @@ async function runFalImage(ctx, apikey, prompt) {
     }
 
     const successEmbed = buildEmbed(
-      'Fal.ai Image Generated Successfully',
+      'Fal.ai Image Generated Successfully (FLUX.1)',
       `Prompt: *${prompt}*`,
       [],
       0x00ff00
@@ -356,18 +356,18 @@ async function runFalImage(ctx, apikey, prompt) {
   }
 }
 
-// Helper: Fal.ai gpt-images-v2-edit API
+// Helper: Fal.ai flux/schnell/redux API for Image Editing
 async function runFalImageEdit(ctx, apikey, prompt, imageUrl) {
   const hashedKey = sha512(apikey);
   const statusEmbed = buildEmbed(
-    'Fal.ai Image Edit',
+    'Fal.ai Image Edit (FLUX.1 Redux)',
     `Key Hashed: ||${hashedKey.slice(0, 12)}...${hashedKey.slice(-12)}||\nSending modification request...`
   );
   await respond(ctx, { embeds: [statusEmbed] });
 
   try {
     const res = await axios.post(
-      'https://queue.fal.run/fal-ai/fast-sdxl/image-to-image', 
+      'https://queue.fal.run/fal-ai/flux/schnell/redux', 
       { 
         image_url: imageUrl,
         prompt: prompt,
@@ -388,7 +388,7 @@ async function runFalImageEdit(ctx, apikey, prompt, imageUrl) {
     }
 
     const successEmbed = buildEmbed(
-      'Fal.ai Image Modified',
+      'Fal.ai Image Modified (FLUX.1 Redux)',
       `Instruction: *${prompt}*`,
       [],
       0x00ff00
