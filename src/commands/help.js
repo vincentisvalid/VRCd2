@@ -29,19 +29,34 @@ function runHelp(ctx, client) {
     categories[cat].push(cmd);
   });
 
-  const embed = buildEmbed(
+  const embeds = [];
+  let currentEmbed = buildEmbed(
     'VRCd Bot Commands Help Index',
-    'Here are all available commands categorized. Use them with Prefix `.` or as Slack-style Slash Commands.'
+    'Here are all available commands categorized. Use them with Prefix `.` or as Slash Commands.'
   );
+  
+  let fieldsCount = 0;
 
   for (const [cat, cmdList] of Object.entries(categories)) {
+    if (fieldsCount >= 15) {
+      embeds.push(currentEmbed);
+      currentEmbed = buildEmbed(
+        'VRCd Bot Commands Help Index (Continued)',
+        'Additional command categories:'
+      );
+      fieldsCount = 0;
+    }
+
     const value = cmdList.map(cmd => {
       const aliasesStr = cmd.aliases && cmd.aliases.length > 0 ? ` (Aliases: ${cmd.aliases.join(', ')})` : '';
       return `\`${cmd.name}\` - *${cmd.description}*${aliasesStr}`;
     }).join('\n');
     
-    embed.addFields({ name: `== ${cat.toUpperCase()} ==`, value: value.slice(0, 1024) });
+    currentEmbed.addFields({ name: `== ${cat.toUpperCase()} ==`, value: value.slice(0, 1024) });
+    fieldsCount++;
   }
+  
+  embeds.push(currentEmbed);
 
-  return respond(ctx, { embeds: [embed] });
+  return respond(ctx, { embeds });
 }

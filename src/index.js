@@ -61,6 +61,7 @@ for (const file of commandFiles) {
     
     if (Array.isArray(cmdList)) {
       for (const cmd of cmdList) {
+        cmd.sourceFile = file;
         client.commands.set(cmd.name, cmd);
         if (cmd.aliases && cmd.aliases.length > 0) {
           for (const alias of cmd.aliases) {
@@ -90,11 +91,18 @@ client.once('ready', async () => {
   try {
     console.log('[Slash Commands] Registering application endpoints...');
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-    const body = client.commands.map(cmd => ({
-      name: cmd.name,
-      description: cmd.description,
-      options: cmd.options || []
-    }));
+    const excludedFiles = [
+      'conversion.js', 'crypto.js', 'dev.js', 'dictionary.js', 
+      'fun.js', 'math.js', 'servertools.js', 'textutils.js', 'time.js',
+      'cyberdefense.js'
+    ];
+    const body = client.commands
+      .filter(cmd => !excludedFiles.includes(cmd.sourceFile) && (cmd.sourceFile !== 'media.js' || cmd.name === 'media'))
+      .map(cmd => ({
+        name: cmd.name,
+        description: cmd.description,
+        options: cmd.options || []
+      }));
 
     await rest.put(
       Routes.applicationCommands(process.env.DISCORD_CLIENT_ID || client.user.id),
