@@ -285,6 +285,23 @@ export default [
       }
       return runBackup(interaction);
     }
+  },
+  {
+    name: 'geolocate',
+    description: 'Resolve geographical information from an IPv4 address.',
+    category: 'Bonus',
+    aliases: ['iplookup', 'ip'],
+    options: [
+      { name: 'ip', type: 3, description: 'IPv4 Address to lookup', required: true }
+    ],
+    async execute(message, args, client) {
+      if (args.length === 0) return respond(message, { content: 'Usage: `.geolocate <ipv4_address>`' });
+      return runGeolocate(message, args[0]);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runGeolocate(interaction, interaction.options.getString('ip'));
+    }
   }
 ];
 
@@ -687,5 +704,40 @@ async function runBackup(ctx) {
     await respond(ctx, { content: 'Failed to compile configuration backup.' });
   } finally {
     if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+  }
+}
+
+// 16. Geolocate IP address
+async function runGeolocate(ctx, ip) {
+  const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  if (!ipv4Regex.test(ip)) {
+    return respond(ctx, { content: '❌ Invalid IPv4 address format.' });
+  }
+
+  try {
+    const url = `http://ip-api.com/json/${ip}`;
+    const res = await axios.get(url, { timeout: 5000 });
+    const d = res.data;
+
+    if (d.status === 'fail') {
+      return respond(ctx, { content: `❌ IP lookup failed: ${d.message}` });
+    }
+
+    const embed = buildEmbed(
+      `IP Geolocation: ${ip}`,
+      `Details resolved via ip-api.`,
+      [
+        { name: 'Location', value: `${d.city || 'Unknown'}, ${d.regionName || 'Unknown'}, ${d.country || 'Unknown'}`, inline: true },
+        { name: 'ZIP Code', value: `\`${d.zip || 'N/A'}\``, inline: true },
+        { name: 'Coordinates', value: `Lat: \`${d.lat}\` | Lon: \`${d.lon}\``, inline: true },
+        { name: 'Timezone', value: `\`${d.timezone || 'Unknown'}\``, inline: true },
+        { name: 'ISP', value: `\`${d.isp || 'Unknown'}\``, inline: true },
+        { name: 'Organization', value: `\`${d.org || 'Unknown'}\``, inline: true }
+      ],
+      0x4682b4
+    );
+    await respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    await respond(ctx, { content: `Failed to geolocate IP: ${err.message}` });
   }
 }
