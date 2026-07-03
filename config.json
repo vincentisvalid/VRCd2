@@ -1,0 +1,15 @@
+{
+  "defaultPrefix": ".",
+  "allowedAdminRoles": [
+    "1520892811736514731",
+    "1517418461779722300"
+  ],
+  "defaultOllamaModel": "llama3",
+  "falAiDefaultModel": "fal-ai/fast-sdxl",
+  "steamWebApiKey": "",
+  "weatherApiKey": "",
+  "cryptoApiKey": "",
+  "lastfmApiKey": "",
+  "spotifyClientId": "",
+  "spotifyClientSecret": ""
+}

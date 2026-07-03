@@ -1,0 +1,25 @@
+{
+  "name": "vrcd-bot",
+  "version": "1.0.0",
+  "description": "Production-grade modular Discord Bot framework matching VRCd Bot design specifications.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.17.0",
+    "axios": "^1.7.2",
+    "canvas": "^2.11.2",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "fluent-ffmpeg": "^2.1.3",
+    "libsodium-wrappers": "^0.7.15",
+    "yt-dlp-wrap": "^2.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "license": "MIT"
+}
