@@ -158,6 +158,51 @@ export default [
       const text = interaction.options.getString('text');
       return updateProfileField(interaction, 'career', text);
     }
+  },
+  {
+    name: 'lookupuser',
+    description: 'Query comprehensive information about a server member or global user.',
+    category: 'UserInfo',
+    aliases: ['lookup', 'whois', 'uinfo', 'userinfo'],
+    options: [
+      {
+        name: 'user',
+        type: 6, // User
+        description: 'Target user to view',
+        required: false
+      }
+    ],
+    async execute(message, args, client) {
+      let targetUser = message.author;
+      if (args.length > 0) {
+        // Try mention
+        const mention = message.mentions.users.first();
+        if (mention) {
+          targetUser = mention;
+        } else {
+          // Try ID
+          const id = args[0];
+          if (/^\d+$/.test(id)) {
+            const fetched = await client.users.fetch(id).catch(() => null);
+            if (fetched) targetUser = fetched;
+          } else {
+            // Try matching username/nickname in guild members
+            const search = args.join(' ');
+            if (message.guild) {
+              const foundMembers = await message.guild.members.fetch({ query: search, limit: 1 }).catch(() => null);
+              const member = foundMembers?.first();
+              if (member) targetUser = member.user;
+            }
+          }
+        }
+      }
+      return executeLookup(message, targetUser, client);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      const targetUser = interaction.options.getUser('user') || interaction.user;
+      return executeLookup(interaction, targetUser, client);
+    }
   }
 ];
 
@@ -226,5 +271,69 @@ async function updateProfileField(ctx, fieldName, text) {
   db.profiles.set(userId, profile);
 
   const embed = buildEmbed('Profile Updated', `Successfully set your **${fieldName}** field to:\n*${text}*`, [], 0x00ffcc);
+  return respond(ctx, { embeds: [embed] });
+}
+
+// Helper: Detailed User Lookup Profile
+async function executeLookup(ctx, targetUser, client) {
+  const guild = ctx.guild;
+  const member = guild ? await guild.members.fetch(targetUser.id).catch(() => null) : null;
+  const profile = db.profiles.get(targetUser.id, null);
+
+  // Fetch full user to get banner/accent color
+  const fullUser = await client.users.fetch(targetUser.id, { force: true }).catch(() => targetUser);
+
+  const embed = buildEmbed(
+    `User Lookup: ${fullUser.tag}`,
+    `Detailed inspection profile for <@${fullUser.id}>.`,
+    [],
+    fullUser.accentColor || 0x8a2be2
+  );
+
+  embed.setThumbnail(fullUser.displayAvatarURL({ size: 256, extension: 'png' }));
+
+  // Basic Account Details
+  const createdDate = `<t:${Math.floor(fullUser.createdTimestamp / 1000)}:R>`;
+  embed.addFields(
+    { name: 'Username', value: `\`${fullUser.username}\``, inline: true },
+    { name: 'User ID', value: `\`${fullUser.id}\``, inline: true },
+    { name: 'Account Created', value: createdDate, inline: true }
+  );
+
+  // Guild Specific Details
+  if (member) {
+    const joinedDate = `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`;
+    const boosterDate = member.premiumSince ? `<t:${Math.floor(member.premiumSinceTimestamp / 1000)}:R>` : 'No';
+    const roles = member.roles.cache
+      .filter(r => r.id !== guild.id)
+      .map(r => `<@&${r.id}>`)
+      .slice(0, 15)
+      .join(', ') || 'None';
+    const rolesCount = member.roles.cache.size - 1;
+
+    embed.addFields(
+      { name: 'Server Nickname', value: member.nickname ? `\`${member.nickname}\`` : 'None', inline: true },
+      { name: 'Joined Server', value: joinedDate, inline: true },
+      { name: 'Boosting Server', value: boosterDate, inline: true },
+      { name: `Roles (${rolesCount})`, value: rolesCount > 15 ? `${roles} (and ${rolesCount - 15} more)` : roles }
+    );
+  }
+
+  // Custom Profile Database Fields (timezone, bio, games, musicgenre, career, lastfm, spotify)
+  if (profile) {
+    const profileDetails = [];
+    if (profile.timezone) profileDetails.push(`🕒 **Timezone**: \`${profile.timezone}\``);
+    if (profile.career) profileDetails.push(`💼 **Career**: \`${profile.career}\``);
+    if (profile.bio) profileDetails.push(`📝 **Bio**: *${profile.bio}*`);
+    if (profile.games) profileDetails.push(`🎮 **Games**: ${profile.games}`);
+    if (profile.musicgenre) profileDetails.push(`🎵 **Music Genres**: ${profile.musicgenre}`);
+    if (profile.lastfm) profileDetails.push(`🎵 **Last.fm**: [${profile.lastfm}](https://last.fm/user/${profile.lastfm})`);
+    if (profile.spotify) profileDetails.push(`🟢 **Spotify**: Connected`);
+
+    if (profileDetails.length > 0) {
+      embed.addFields({ name: '🗂️ Custom Database Profile', value: profileDetails.join('\n') });
+    }
+  }
+
   return respond(ctx, { embeds: [embed] });
 }

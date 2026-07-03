@@ -1,5 +1,7 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
+import { randomUUID } from 'crypto';
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { AttachmentBuilder } from 'discord.js';
@@ -35,7 +37,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runValentineGif(interaction);
+      const url = interaction.options.getString('url');
+      return runValentineGif(interaction, url);
     }
   },
   {
@@ -48,7 +51,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runRainbowEffect(interaction);
+      const url = interaction.options.getString('url');
+      return runRainbowEffect(interaction, url);
     }
   },
   {
@@ -66,7 +70,8 @@ export default [
     async executeSlash(interaction) {
       await interaction.deferReply();
       const strength = interaction.options.getNumber('strength') || 5;
-      return runFFmpegCommand(interaction, `-vf "gblur=sigma=${strength}"`, 'blur');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, `-vf "gblur=sigma=${strength}"`, 'blur', null, url);
     }
   },
   {
@@ -79,7 +84,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "curves=preset=vintage,colorbalance=rs=0.15:gs=0.05:bs=-0.1,vignette=0.2"', 'toaster');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "curves=preset=vintage,colorbalance=rs=0.15:gs=0.05:bs=-0.1,vignette=0.2"', 'toaster', url);
     }
   },
   {
@@ -92,7 +98,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runSpeechBubble(interaction);
+      const url = interaction.options.getString('url');
+      return runSpeechBubble(interaction, url);
     }
   },
   {
@@ -105,14 +112,46 @@ export default [
       { name: 'url', type: 3, description: 'Image URL or attachment', required: false }
     ],
     async execute(message, args) {
-      if (args.length < 2) return respond(message, { content: 'Usage: `.motivate "top text" "bottom text"`' });
-      return runMotivate(message, args[0], args[1]);
+      if (args.length === 0) return respond(message, { content: 'Usage: `.motivate <text>` or `.motivate <top> | <bottom>`' });
+      const commandName = 'motivate';
+      const activePrefix = message.content.startsWith('.') ? '.' : '/';
+      const rawText = message.content.slice(activePrefix.length + commandName.length).trim();
+      
+      let topText = '';
+      let bottomText = '';
+      
+      if (rawText.includes('|')) {
+        const parts = rawText.split('|');
+        topText = parts[0].trim();
+        bottomText = parts[1].trim();
+      } else if (rawText.includes(',')) {
+        const parts = rawText.split(',');
+        topText = parts[0].trim();
+        bottomText = parts[1].trim();
+      } else {
+        const words = rawText.split(/\s+/).filter(Boolean);
+        if (words.length === 1) {
+          topText = words[0];
+          bottomText = '';
+        } else {
+          const half = Math.ceil(words.length / 2);
+          topText = words.slice(0, half).join(' ');
+          bottomText = words.slice(half).join(' ');
+        }
+      }
+      
+      // Clean quotes
+      topText = topText.replace(/^["']|["']$/g, '');
+      bottomText = bottomText.replace(/^["']|["']$/g, '');
+      
+      return runMotivate(message, topText, bottomText);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
       const top = interaction.options.getString('top');
       const bottom = interaction.options.getString('bottom');
-      return runMotivate(interaction, top, bottom);
+      const url = interaction.options.getString('url');
+      return runMotivate(interaction, top, bottom, url);
     }
   },
   {
@@ -125,7 +164,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=120:120,scale=600:600:flags=neighbor,drawgrid=w=60:h=60:t=2:c=black"', 'rubiks');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "scale=120:120,scale=600:600:flags=neighbor,drawgrid=w=60:h=60:t=2:c=black"', 'rubiks', url);
     }
   },
   {
@@ -138,7 +178,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runSpinEffect(interaction);
+      const url = interaction.options.getString('url');
+      return runSpinEffect(interaction, url);
     }
   },
   {
@@ -151,7 +192,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-filter_complex "[0:v]split[orig][glow];[glow]threshold=180,boxblur=15:15[blurred];[orig][blurred]blend=all_mode=screen:all_opacity=0.6"', 'bloom');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-filter_complex "[0:v]split[orig][glow];[glow]threshold=180,boxblur=15:15[blurred];[orig][blurred]blend=all_mode=screen:all_opacity=0.6"', 'bloom', url);
     }
   },
   {
@@ -164,7 +206,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFortuneFrame(interaction);
+      const url = interaction.options.getString('url');
+      return runFortuneFrame(interaction, url);
     }
   },
   {
@@ -177,7 +220,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "eq=contrast=3.0:saturation=5.0:brightness=-0.05,unsharp=5:5:5.0:5:5:5.0" -q:v 1', 'deepfry');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "eq=contrast=3.0:saturation=5.0:brightness=-0.05,unsharp=5:5:5.0:5:5:5.0" -q:v 1', 'deepfry', url);
     }
   },
   {
@@ -190,7 +234,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFlagOverlay(interaction, false);
+      const url = interaction.options.getString('url');
+      return runFlagOverlay(interaction, false, url);
     }
   },
   {
@@ -203,7 +248,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=iw/2:-1,scale=iw*2:-1"', 'gifmagik');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "scale=iw/2:-1,scale=iw*2:-1"', 'gifmagik', url);
     }
   },
   {
@@ -223,7 +269,8 @@ export default [
       await interaction.deferReply();
       const top = interaction.options.getString('top');
       const bottom = interaction.options.getString('bottom');
-      return runMemeText(interaction, top, bottom);
+      const url = interaction.options.getString('url');
+      return runMemeText(interaction, top, bottom, url);
     }
   },
   {
@@ -236,7 +283,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFlagOverlay(interaction, true);
+      const url = interaction.options.getString('url');
+      return runFlagOverlay(interaction, true, url);
     }
   },
   {
@@ -254,7 +302,8 @@ export default [
     async executeSlash(interaction) {
       await interaction.deferReply();
       const text = interaction.options.getString('text');
-      return runHeartBorder(interaction, text);
+      const url = interaction.options.getString('url');
+      return runHeartBorder(interaction, text, url);
     }
   },
   {
@@ -267,7 +316,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, `-vf "geq=r='r(X+15*sin(2*PI*Y/100),Y)':g='g(X+15*sin(2*PI*Y/100),Y)':b='b(X+15*sin(2*PI*Y/100),Y)'"`, 'magik');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, `-vf "geq=r='r(X+15*sin(2*PI*Y/100),Y)':g='g(X+15*sin(2*PI*Y/100),Y)':b='b(X+15*sin(2*PI*Y/100),Y)'"`, 'magik', url);
     }
   },
   {
@@ -285,7 +335,8 @@ export default [
     async executeSlash(interaction) {
       await interaction.deferReply();
       const text = interaction.options.getString('text');
-      return runCaptionText(interaction, text);
+      const url = interaction.options.getString('url');
+      return runCaptionText(interaction, text, url);
     }
   },
   {
@@ -298,7 +349,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "edgedetect=low=0.1:high=0.3,colorbalance=rs=-0.6:gs=0.6:bs=-0.6"', 'circuitboard');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "edgedetect=low=0.1:high=0.3,colorbalance=rs=-0.6:gs=0.6:bs=-0.6"', 'circuitboard', url);
     }
   },
   {
@@ -311,7 +363,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runSpreadEffect(interaction);
+      const url = interaction.options.getString('url');
+      return runSpreadEffect(interaction, url);
     }
   },
   {
@@ -324,7 +377,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.6:k2=0.2"', 'swirl');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.6:k2=0.2"', 'swirl', url);
     }
   },
   {
@@ -337,7 +391,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runBookOverlay(interaction);
+      const url = interaction.options.getString('url');
+      return runBookOverlay(interaction, url);
     }
   },
   {
@@ -350,7 +405,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=0.4:k2=-0.4"', 'wormhole');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=0.4:k2=-0.4"', 'wormhole', url);
     }
   },
   {
@@ -363,7 +419,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runBillboardFrame(interaction);
+      const url = interaction.options.getString('url');
+      return runBillboardFrame(interaction, url);
     }
   },
   {
@@ -376,7 +433,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=iw/16:-1,scale=iw*16:-1:flags=neighbor"', 'pixelate');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "scale=iw/16:-1,scale=iw*16:-1:flags=neighbor"', 'pixelate', url);
     }
   },
   {
@@ -389,7 +447,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runTattooEffect(interaction);
+      const url = interaction.options.getString('url');
+      return runTattooEffect(interaction, url);
     }
   },
   {
@@ -402,7 +461,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22"', 'fisheye');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22"', 'fisheye', url);
     }
   },
   {
@@ -415,7 +475,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "edgedetect=low=0.1:high=0.3,hue=h=180:s=2"', 'neon');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "edgedetect=low=0.1:high=0.3,hue=h=180:s=2"', 'neon', url);
     }
   },
   {
@@ -428,7 +489,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "format=gray"', 'grayscale');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "format=gray"', 'grayscale', url);
     }
   },
   {
@@ -441,7 +503,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "negate"', 'inverted');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "negate"', 'inverted', url);
     }
   },
   {
@@ -454,7 +517,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=2*iw:-1,crop=iw/2:ih/2"', 'zoom');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "scale=2*iw:-1,crop=iw/2:ih/2"', 'zoom', url);
     }
   },
   {
@@ -472,7 +536,8 @@ export default [
     async executeSlash(interaction) {
       await interaction.deferReply();
       const mult = interaction.options.getNumber('multiplier') || 1.5;
-      return runSpeedup(interaction, mult);
+      const url = interaction.options.getString('url');
+      return runSpeedup(interaction, mult, url);
     }
   },
   {
@@ -485,7 +550,8 @@ export default [
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
-      return runZoomBlur(interaction);
+      const url = interaction.options.getString('url');
+      return runZoomBlur(interaction, url);
     }
   },
   {
@@ -499,7 +565,8 @@ export default [
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
-      return runGlitchEffect(interaction);
+      const url = interaction.options.getString('url');
+      return runGlitchEffect(interaction, url);
     }
   },
   {
@@ -513,7 +580,8 @@ export default [
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
-      return runAsciiCommand(interaction);
+      const url = interaction.options.getString('url');
+      return runAsciiCommand(interaction, url);
     }
   },
   {
@@ -527,7 +595,8 @@ export default [
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "colorbalance=rs=0.15:gs=-0.05:bs=-0.1,boxblur=1:1,noise=alls=15:allf=t+u,scale=720:576"', 'vhs');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "colorbalance=rs=0.15:gs=-0.05:bs=-0.1,boxblur=1:1,noise=alls=15:allf=t+u,scale=720:576"', 'vhs', null, url);
     }
   },
   {
@@ -566,7 +635,8 @@ export default [
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "colorkey=0xFFFFFF:0.1:0.1,format=rgba"', 'nobg', '.png');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "colorkey=0xFFFFFF:0.1:0.1,format=rgba"', 'nobg', '.png', url);
     }
   },
   {
@@ -608,11 +678,12 @@ export default [
     aliases: ['vrfilter'],
     options: [{ name: 'url', type: 3, description: 'Image/Video URL or attachment', required: false }],
     async execute(message, args, client) {
-      return runFFmpegCommand(message, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];movie=\'/dev/stdin\'[in];[in]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r];[l][r]hstack"', 'vr_lens');
+      return runFFmpegCommand(message, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];split[left][right];[left]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l_lens];[right]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r_lens];[l_lens][r_lens]hstack"', 'vr_lens');
     },
     async executeSlash(interaction, client) {
       await interaction.deferReply();
-      return runFFmpegCommand(interaction, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];split[left][right];[left]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l_lens];[right]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r_lens];[l_lens][r_lens]hstack"', 'vr_lens');
+      const url = interaction.options.getString('url');
+      return runFFmpegCommand(interaction, '-vf "scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l];split[left][right];[left]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[l_lens];[right]scale=720:720,lenscorrection=cx=0.5:cy=0.5:k1=-0.22:k2=-0.22[r_lens];[l_lens][r_lens]hstack"', 'vr_lens', null, url);
     }
   }
 ];
@@ -627,31 +698,73 @@ function runMediaHelp(ctx) {
   return respond(ctx, { embeds: [buildEmbed('🎬 VRCd2 Media Processing Engine', 'Select from the following FFmpeg filter presets:', fields, 0x1fc2c2)] });
 }
 
-function getAttachment(ctx) {
+const MAX_INPUT_BYTES = 25 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.mov', '.m4v', '.webm']);
+
+// Rejects loopback/link-local/RFC1918 literals to reduce (not eliminate) SSRF exposure
+// from the user-supplied `url` option. This is a literal-string check only — it does not
+// resolve DNS, so a hostname that resolves to a private IP at request time is not caught here.
+function isPrivateHost(hostname) {
+  if (hostname === 'localhost' || hostname.endsWith('.local')) return true;
+  const m = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
+  if (a === 127 || a === 10 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+// Only trust a whitelisted extension; attachment/URL filenames are attacker-controlled
+// and get embedded in shell-invoked ffmpeg command paths, so an unrecognized extension
+// falls back to a safe default rather than being used verbatim.
+function safeExt(name, fallback = '.png') {
+  const ext = path.extname(name || '').toLowerCase();
+  return ALLOWED_EXTENSIONS.has(ext) ? ext : fallback;
+}
+
+function resolveInput(ctx, urlArg) {
   const message = ctx.message || ctx;
   if (message.attachments && message.attachments.size > 0) {
-    return message.attachments.first();
+    const att = message.attachments.first();
+    return { url: att.url, name: att.name, size: att.size };
+  }
+  if (urlArg) {
+    let parsed;
+    try {
+      parsed = new URL(urlArg);
+    } catch (_) {
+      return null;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (isPrivateHost(parsed.hostname)) return null;
+    const name = path.basename(parsed.pathname) || 'file';
+    return { url: urlArg, name, size: null };
   }
   return null;
 }
 
-async function runFFmpegCommand(ctx, filterString, suffix, forceExt = null) {
-  const attachment = getAttachment(ctx);
+async function runFFmpegCommand(ctx, filterString, suffix, forceExt = null, urlArg = null) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
-    return respond(ctx, { content: 'Please attach a media file (image/video) to execute this command.' });
+    return respond(ctx, { content: 'Please attach a media file (image/video) to execute this command, or pass a direct `url`.' });
+  }
+  if (attachment.size && attachment.size > MAX_INPUT_BYTES) {
+    return respond(ctx, { content: 'Input file is too large (max 25MB).' });
   }
 
-  const ext = forceExt || path.extname(attachment.name) || '.mp4';
-  const inputPath = path.join(TMP_DIR, `input_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `output_${Date.now()}_${suffix}${ext}`);
+  const ext = forceExt || safeExt(attachment.name, '.mp4');
+  const inputPath = path.join(TMP_DIR, `input_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `output_${randomUUID()}_${suffix}${ext}`);
 
   try {
     await downloadFile(attachment.url, inputPath);
-    const cmd = `ffmpeg -y -i "${inputPath}" ${filterString} -c:a copy "${outputPath}"`;
-    await executeShell(cmd);
+    const filterArgs = tokenizeFilterString(filterString);
+    await runFfmpeg(['-y', '-i', inputPath, ...filterArgs, '-c:a', 'copy', outputPath]);
 
-    const stats = fs.statSync(outputPath);
-    if (stats.size > 25 * 1024 * 1024) {
+    const stats = await fsp.stat(outputPath);
+    if (stats.size > MAX_INPUT_BYTES) {
       return respond(ctx, { content: 'Processed file exceeded Discord limits. Try a shorter or smaller input.' });
     }
 
@@ -662,20 +775,17 @@ async function runFFmpegCommand(ctx, filterString, suffix, forceExt = null) {
     console.error('[FFmpeg Exec Error]:', err.message);
     await respond(ctx, { content: `Failed to process video/image. FFmpeg error logged.` });
   } finally {
-    try {
-      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-    } catch (_) {}
+    await Promise.all([inputPath, outputPath].map(p => fsp.unlink(p).catch(() => {})));
   }
 }
 
-async function runAsciiCommand(ctx) {
-  const attachment = getAttachment(ctx);
-  if (!attachment || !/\\.(jpg|jpeg|png)$/i.test(attachment.name)) {
+async function runAsciiCommand(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
+  if (!attachment || !/\.(jpg|jpeg|png)$/i.test(attachment.name)) {
     return respond(ctx, { content: 'Please attach a valid image file (PNG/JPG).' });
   }
 
-  const inputPath = path.join(TMP_DIR, `ascii_in_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `ascii_in_${randomUUID()}.png`);
   try {
     await downloadFile(attachment.url, inputPath);
 
@@ -707,7 +817,7 @@ async function runAsciiCommand(ctx) {
     }
 
     if (asciiStr.length > 1900) {
-      const txtPath = path.join(TMP_DIR, `ascii_${Date.now()}.txt`);
+      const txtPath = path.join(TMP_DIR, `ascii_${randomUUID()}.txt`);
       fs.writeFileSync(txtPath, asciiStr, 'utf-8');
       const file = new AttachmentBuilder(txtPath, { name: 'ascii_art.txt' });
       await respond(ctx, { files: [file] });
@@ -724,20 +834,25 @@ async function runAsciiCommand(ctx) {
   }
 }
 
-async function runCutVideo(ctx, start, duration) {
-  const attachment = getAttachment(ctx);
+const TIME_SPEC_RE = /^\d{1,2}(:\d{2}){0,2}(\.\d+)?$/;
+
+async function runCutVideo(ctx, start, duration, urlArg) {
+  if (!TIME_SPEC_RE.test(start) || !TIME_SPEC_RE.test(duration)) {
+    return respond(ctx, { content: 'Invalid time format. Use seconds or `HH:MM:SS` (e.g. `00:10` or `15`).' });
+  }
+
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach a video file to cut.' });
   }
 
-  const ext = path.extname(attachment.name) || '.mp4';
-  const inputPath = path.join(TMP_DIR, `cut_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `cut_out_${Date.now()}${ext}`);
+  const ext = safeExt(attachment.name, '.mp4');
+  const inputPath = path.join(TMP_DIR, `cut_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `cut_out_${randomUUID()}${ext}`);
 
   try {
     await downloadFile(attachment.url, inputPath);
-    const cmd = `ffmpeg -y -ss ${start} -i "${inputPath}" -t ${duration} -c copy "${outputPath}"`;
-    await executeShell(cmd);
+    await runFfmpeg(['-y', '-ss', start, '-i', inputPath, '-t', duration, '-c', 'copy', outputPath]);
 
     const file = new AttachmentBuilder(outputPath, { name: `cut_segment${ext}` });
     await respond(ctx, { files: [file] });
@@ -745,29 +860,31 @@ async function runCutVideo(ctx, start, duration) {
     console.error('[Video Cut Error]:', err.message);
     await respond(ctx, { content: 'Failed to trim video file.' });
   } finally {
-    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    await Promise.all([inputPath, outputPath].map(p => fsp.unlink(p).catch(() => {})));
   }
 }
 
-async function runGreenscreen(ctx, bgUrl) {
-  const attachment = getAttachment(ctx);
+async function runGreenscreen(ctx, bgUrl, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach a greenscreen image/video to key.' });
   }
 
-  const ext = path.extname(attachment.name) || '.mp4';
-  const inputPath = path.join(TMP_DIR, `gs_in_${Date.now()}${ext}`);
-  const bgPath = path.join(TMP_DIR, `gs_bg_${Date.now()}.png`);
-  const outputPath = path.join(TMP_DIR, `gs_out_${Date.now()}${ext}`);
+  const ext = safeExt(attachment.name, '.mp4');
+  const inputPath = path.join(TMP_DIR, `gs_in_${randomUUID()}${ext}`);
+  const bgPath = path.join(TMP_DIR, `gs_bg_${randomUUID()}.png`);
+  const outputPath = path.join(TMP_DIR, `gs_out_${randomUUID()}${ext}`);
 
   try {
     await downloadFile(attachment.url, inputPath);
     await downloadFile(bgUrl, bgPath);
 
-    const filter = `-filter_complex "[0:v]colorkey=0x00FF00:0.35:0.1[ck];[1:v]scale=iw:ih[bg];[bg][ck]overlay=shortest=1[out]" -map "[out]"`;
-    const cmd = `ffmpeg -y -i "${inputPath}" -i "${bgPath}" ${filter} "${outputPath}"`;
-    await executeShell(cmd);
+    await runFfmpeg([
+      '-y', '-i', inputPath, '-i', bgPath,
+      '-filter_complex', '[0:v]colorkey=0x00FF00:0.35:0.1[ck];[1:v]scale=iw:ih[bg];[bg][ck]overlay=shortest=1[out]',
+      '-map', '[out]',
+      outputPath
+    ]);
 
     const file = new AttachmentBuilder(outputPath, { name: `greenscreen_composite${ext}` });
     await respond(ctx, { files: [file] });
@@ -775,33 +892,51 @@ async function runGreenscreen(ctx, bgUrl) {
     console.error('[Greenscreen Error]:', err.message);
     await respond(ctx, { content: 'Failed to composite greenscreen video with background.' });
   } finally {
-    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-    if (fs.existsSync(bgPath)) fs.unlinkSync(bgPath);
-    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    await Promise.all([inputPath, bgPath, outputPath].map(p => fsp.unlink(p).catch(() => {})));
   }
 }
 
-async function runSpeedup(ctx, speed) {
-  const attachment = getAttachment(ctx);
+// ffmpeg's atempo filter only accepts 0.5-2.0 per stage; chain stages to cover a wider range.
+function buildAtempoChain(speed) {
+  const stages = [];
+  let remaining = speed;
+  while (remaining > 2.0) {
+    stages.push(2.0);
+    remaining /= 2.0;
+  }
+  while (remaining < 0.5) {
+    stages.push(0.5);
+    remaining /= 0.5;
+  }
+  stages.push(remaining);
+  return stages.map(s => `atempo=${s.toFixed(3)}`).join(',');
+}
+
+async function runSpeedup(ctx, speed, urlArg) {
+  if (!Number.isFinite(speed) || speed <= 0 || speed > 100) {
+    return respond(ctx, { content: 'Speed multiplier must be a positive number (up to 100).' });
+  }
+
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach a video file to change speed.' });
   }
 
-  const ext = path.extname(attachment.name) || '.mp4';
-  const inputPath = path.join(TMP_DIR, `speed_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `speed_out_${Date.now()}${ext}`);
+  const ext = safeExt(attachment.name, '.mp4');
+  const inputPath = path.join(TMP_DIR, `speed_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `speed_out_${randomUUID()}${ext}`);
 
   try {
     await downloadFile(attachment.url, inputPath);
-    const setptsVal = (1.0 / speed).toFixed(2);
-    let filter = `-vf "setpts=${setptsVal}*PTS"`;
-    if (speed >= 2.0) {
-      filter += ` -af "atempo=2.0"`;
-    } else if (speed <= 0.5) {
-      filter += ` -af "atempo=0.5"`;
-    }
-    const cmd = `ffmpeg -y -i "${inputPath}" ${filter} "${outputPath}"`;
-    await executeShell(cmd);
+    const setptsVal = (1.0 / speed).toFixed(3);
+    const atempoChain = buildAtempoChain(speed);
+
+    await runFfmpeg([
+      '-y', '-i', inputPath,
+      '-vf', `setpts=${setptsVal}*PTS`,
+      '-af', atempoChain,
+      outputPath
+    ]);
 
     const file = new AttachmentBuilder(outputPath, { name: `speed_${speed}x${ext}` });
     await respond(ctx, { files: [file] });
@@ -809,34 +944,57 @@ async function runSpeedup(ctx, speed) {
     console.error('[Video Speed Error]:', err.message);
     await respond(ctx, { content: 'Failed to adjust video speed.' });
   } finally {
-    if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    await Promise.all([inputPath, outputPath].map(p => fsp.unlink(p).catch(() => {})));
   }
 }
 
-function executeShell(cmd) {
+// Runs ffmpeg via execFile (argv array, no shell) so no user- or filename-derived value
+// can ever be interpreted as a shell metacharacter, unlike the previous exec()-based approach.
+function runFfmpeg(args, timeoutMs = 60000) {
   return new Promise((resolve, reject) => {
-    exec(cmd, (err, stdout, stderr) => {
+    execFile('ffmpeg', args, { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(err);
       else resolve({ stdout, stderr });
     });
   });
 }
 
+// Quote-aware tokenizer for our own hardcoded filter-string literals (e.g. `-vf "gblur=sigma=5"`).
+// Only ever runs on static strings authored in this file, not on raw user input.
+function tokenizeFilterString(str) {
+  const tokens = [];
+  let i = 0;
+  while (i < str.length) {
+    while (i < str.length && /\s/.test(str[i])) i++;
+    if (i >= str.length) break;
+    if (str[i] === '"') {
+      const end = str.indexOf('"', i + 1);
+      const close = end === -1 ? str.length : end;
+      tokens.push(str.slice(i + 1, close));
+      i = close + 1;
+    } else {
+      const start = i;
+      while (i < str.length && !/\s/.test(str[i])) i++;
+      tokens.push(str.slice(start, i));
+    }
+  }
+  return tokens;
+}
+
 // ---------------------------------------------------------
 // CUSTOM PREMIUM ANIMATIONS & OVERLAYS (CANVAS & FFmpeg)
 // ---------------------------------------------------------
 
-async function runValentineGif(ctx) {
-  const attachment = getAttachment(ctx);
+async function runValentineGif(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the valentine GIF.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `val_in_${Date.now()}${ext}`);
-  const frameDir = path.join(TMP_DIR, `val_frames_${Date.now()}`);
-  const outputPath = path.join(TMP_DIR, `val_out_${Date.now()}.gif`);
+  const inputPath = path.join(TMP_DIR, `val_in_${randomUUID()}${ext}`);
+  const frameDir = path.join(TMP_DIR, `val_frames_${randomUUID()}`);
+  const outputPath = path.join(TMP_DIR, `val_out_${randomUUID()}.gif`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -878,8 +1036,11 @@ async function runValentineGif(ctx) {
       fs.writeFileSync(framePath, canvas.toBuffer('image/png'));
     }
 
-    const cmd = `ffmpeg -y -framerate 12 -i "${frameDir}/frame_%03d.png" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" "${outputPath}"`;
-    await executeShell(cmd);
+    await runFfmpeg([
+      '-y', '-framerate', '12', '-i', path.join(frameDir, 'frame_%03d.png'),
+      '-vf', 'split[a][b];[a]palettegen[p];[b][p]paletteuse',
+      outputPath
+    ]);
 
     const file = new AttachmentBuilder(outputPath, { name: 'valentine.gif' });
     await respond(ctx, { files: [file] });
@@ -907,22 +1068,22 @@ function drawHeartInCenter(g, cx, cy, size) {
   g.closePath();
 }
 
-async function runRainbowEffect(ctx) {
-  const attachment = getAttachment(ctx);
+async function runRainbowEffect(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach a media file.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const isVideo = /\\.(mp4|mov|m4v|gif)$/i.test(ext);
+  const isVideo = /\.(mp4|mov|m4v|gif)$/i.test(ext);
 
   if (isVideo) {
-    return runFFmpegCommand(ctx, '-vf "hue=h=t*120:s=1.5"', 'rainbow');
+    return runFFmpegCommand(ctx, '-vf "hue=h=t*120:s=1.5"', 'rainbow', null, urlArg);
   }
 
-  const inputPath = path.join(TMP_DIR, `rb_in_${Date.now()}${ext}`);
-  const frameDir = path.join(TMP_DIR, `rb_frames_${Date.now()}`);
-  const outputPath = path.join(TMP_DIR, `rb_out_${Date.now()}.gif`);
+  const inputPath = path.join(TMP_DIR, `rb_in_${randomUUID()}${ext}`);
+  const frameDir = path.join(TMP_DIR, `rb_frames_${randomUUID()}`);
+  const outputPath = path.join(TMP_DIR, `rb_out_${randomUUID()}.gif`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -950,8 +1111,11 @@ async function runRainbowEffect(ctx) {
       fs.writeFileSync(framePath, canvas.toBuffer('image/png'));
     }
 
-    const cmd = `ffmpeg -y -framerate 10 -i "${frameDir}/frame_%03d.png" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" "${outputPath}"`;
-    await executeShell(cmd);
+    await runFfmpeg([
+      '-y', '-framerate', '10', '-i', path.join(frameDir, 'frame_%03d.png'),
+      '-vf', 'split[a][b];[a]palettegen[p];[b][p]paletteuse',
+      outputPath
+    ]);
 
     const file = new AttachmentBuilder(outputPath, { name: 'rainbow.gif' });
     await respond(ctx, { files: [file] });
@@ -971,15 +1135,15 @@ async function runRainbowEffect(ctx) {
   }
 }
 
-async function runSpeechBubble(ctx) {
-  const attachment = getAttachment(ctx);
+async function runSpeechBubble(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the speech bubble.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `sb_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `sb_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `sb_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `sb_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1009,10 +1173,11 @@ async function runSpeechBubble(ctx) {
     g.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
     g.fill();
 
+    // Fix speech bubble tail pointing up correctly
     g.beginPath();
-    g.moveTo(cx - 20, 0);
-    g.lineTo(cx + 20, 0);
-    g.lineTo(cx - 5, headerHeight * 0.65);
+    g.moveTo(cx - 20, cy - ry + 5);
+    g.lineTo(cx + 20, cy - ry + 5);
+    g.lineTo(cx - 15, 0);
     g.closePath();
     g.fill();
 
@@ -1035,15 +1200,15 @@ async function runSpeechBubble(ctx) {
   }
 }
 
-async function runMotivate(ctx, topText, bottomText) {
-  const attachment = getAttachment(ctx);
+async function runMotivate(ctx, topText, bottomText, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the motivational poster.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `mot_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `mot_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `mot_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `mot_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1051,8 +1216,9 @@ async function runMotivate(ctx, topText, bottomText) {
     const { createCanvas, loadImage } = await import('canvas');
     const img = await loadImage(inputPath);
 
-    const borderW = 80;
-    const borderH = 150;
+    // Responsive design scaling
+    const borderW = Math.max(60, Math.round(img.width * 0.1));
+    const borderH = Math.max(160, Math.round(img.height * 0.22));
     const w = img.width + borderW;
     const h = img.height + borderH;
 
@@ -1065,8 +1231,8 @@ async function runMotivate(ctx, topText, bottomText) {
 
     // Draw inner white frame box
     g.strokeStyle = '#ffffff';
-    g.lineWidth = 3;
-    g.strokeRect(borderW / 2 - 5, borderW / 2 - 5, img.width + 10, img.height + 10);
+    g.lineWidth = Math.max(2, Math.round(w * 0.003));
+    g.strokeRect(borderW / 2 - 4, borderW / 2 - 4, img.width + 8, img.height + 8);
 
     // Draw original image
     g.drawImage(img, borderW / 2, borderW / 2, img.width, img.height);
@@ -1076,13 +1242,17 @@ async function runMotivate(ctx, topText, bottomText) {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
 
-    // Top Header
-    g.font = `bold ${Math.max(22, Math.round(w * 0.045))}px Georgia, serif`;
-    g.fillText(topText.toUpperCase(), w / 2, h - 90);
+    // Top Header (Title)
+    const titleSize = Math.max(20, Math.round(w * 0.05));
+    g.font = `bold ${titleSize}px Georgia, serif`;
+    const titleY = img.height + borderW/2 + Math.round((borderH - borderW/2) * 0.35);
+    g.fillText(topText.toUpperCase(), w / 2, titleY);
 
-    // Bottom Subtext
-    g.font = `italic ${Math.max(14, Math.round(w * 0.024))}px Georgia, serif`;
-    g.fillText(bottomText, w / 2, h - 45);
+    // Bottom Subtext (Subtitle)
+    const subSize = Math.max(12, Math.round(w * 0.025));
+    g.font = `italic ${subSize}px Georgia, serif`;
+    const subY = img.height + borderW/2 + Math.round((borderH - borderW/2) * 0.7);
+    g.fillText(bottomText, w / 2, subY);
 
     const buffer = canvas.toBuffer('image/png');
     fs.writeFileSync(outputPath, buffer);
@@ -1101,22 +1271,22 @@ async function runMotivate(ctx, topText, bottomText) {
   }
 }
 
-async function runSpinEffect(ctx) {
-  const attachment = getAttachment(ctx);
+async function runSpinEffect(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach a media file.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const isVideo = /\\.(mp4|mov|m4v|gif)$/i.test(ext);
+  const isVideo = /\.(mp4|mov|m4v|gif)$/i.test(ext);
 
   if (isVideo) {
-    return runFFmpegCommand(ctx, '-vf "rotate=2*PI*t:fillcolor=black"', 'spin');
+    return runFFmpegCommand(ctx, '-vf "rotate=2*PI*t:fillcolor=black"', 'spin', null, urlArg);
   }
 
-  const inputPath = path.join(TMP_DIR, `spin_in_${Date.now()}${ext}`);
-  const frameDir = path.join(TMP_DIR, `spin_frames_${Date.now()}`);
-  const outputPath = path.join(TMP_DIR, `spin_out_${Date.now()}.gif`);
+  const inputPath = path.join(TMP_DIR, `spin_in_${randomUUID()}${ext}`);
+  const frameDir = path.join(TMP_DIR, `spin_frames_${randomUUID()}`);
+  const outputPath = path.join(TMP_DIR, `spin_out_${randomUUID()}.gif`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1148,8 +1318,11 @@ async function runSpinEffect(ctx) {
       fs.writeFileSync(framePath, canvas.toBuffer('image/png'));
     }
 
-    const cmd = `ffmpeg -y -framerate 14 -i "${frameDir}/frame_%03d.png" -vf "split[a][b];[a]palettegen[p];[b][p]paletteuse" "${outputPath}"`;
-    await executeShell(cmd);
+    await runFfmpeg([
+      '-y', '-framerate', '14', '-i', path.join(frameDir, 'frame_%03d.png'),
+      '-vf', 'split[a][b];[a]palettegen[p];[b][p]paletteuse',
+      outputPath
+    ]);
 
     const file = new AttachmentBuilder(outputPath, { name: 'spin.gif' });
     await respond(ctx, { files: [file] });
@@ -1169,15 +1342,15 @@ async function runSpinEffect(ctx) {
   }
 }
 
-async function runMemeText(ctx, topText, bottomText) {
-  const attachment = getAttachment(ctx);
+async function runMemeText(ctx, topText, bottomText, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the meme.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `meme_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `meme_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `meme_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `meme_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1229,15 +1402,15 @@ async function runMemeText(ctx, topText, bottomText) {
   }
 }
 
-async function runCaptionText(ctx, text) {
-  const attachment = getAttachment(ctx);
+async function runCaptionText(ctx, text, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to add a caption.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `cap_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `cap_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `cap_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `cap_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1283,15 +1456,15 @@ async function runCaptionText(ctx, text) {
   }
 }
 
-async function runFortuneFrame(ctx) {
-  const attachment = getAttachment(ctx);
+async function runFortuneFrame(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the fortune card.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `for_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `for_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `for_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `for_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1345,15 +1518,15 @@ async function runFortuneFrame(ctx) {
   }
 }
 
-async function runHeartBorder(ctx, text) {
-  const attachment = getAttachment(ctx);
+async function runHeartBorder(ctx, text, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the heart card.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `heart_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `heart_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `heart_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `heart_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1404,15 +1577,15 @@ async function runHeartBorder(ctx, text) {
   }
 }
 
-async function runFlagOverlay(ctx, isPride) {
-  const attachment = getAttachment(ctx);
+async function runFlagOverlay(ctx, isPride, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to apply the flag overlay.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `flag_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `flag_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `flag_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `flag_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1466,15 +1639,15 @@ async function runFlagOverlay(ctx, isPride) {
   }
 }
 
-async function runSpreadEffect(ctx) {
-  const attachment = getAttachment(ctx);
+async function runSpreadEffect(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `spr_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `spr_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `spr_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `spr_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1540,15 +1713,15 @@ async function runSpreadEffect(ctx) {
   }
 }
 
-async function runBookOverlay(ctx) {
-  const attachment = getAttachment(ctx);
+async function runBookOverlay(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `bk_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `bk_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `bk_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `bk_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1606,15 +1779,15 @@ async function runBookOverlay(ctx) {
   }
 }
 
-async function runBillboardFrame(ctx) {
-  const attachment = getAttachment(ctx);
+async function runBillboardFrame(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `bill_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `bill_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `bill_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `bill_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1672,15 +1845,15 @@ async function runBillboardFrame(ctx) {
   }
 }
 
-async function runTattooEffect(ctx) {
-  const attachment = getAttachment(ctx);
+async function runTattooEffect(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image to create the tattoo.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `tat_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `tat_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `tat_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `tat_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1736,15 +1909,15 @@ async function runTattooEffect(ctx) {
   }
 }
 
-async function runZoomBlur(ctx) {
-  const attachment = getAttachment(ctx);
+async function runZoomBlur(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `zb_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `zb_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `zb_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `zb_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);
@@ -1788,15 +1961,15 @@ async function runZoomBlur(ctx) {
   }
 }
 
-async function runGlitchEffect(ctx) {
-  const attachment = getAttachment(ctx);
+async function runGlitchEffect(ctx, urlArg) {
+  const attachment = resolveInput(ctx, urlArg);
   if (!attachment) {
     return respond(ctx, { content: 'Please attach an image.' });
   }
 
   const ext = path.extname(attachment.name) || '.png';
-  const inputPath = path.join(TMP_DIR, `gl_in_${Date.now()}${ext}`);
-  const outputPath = path.join(TMP_DIR, `gl_out_${Date.now()}.png`);
+  const inputPath = path.join(TMP_DIR, `gl_in_${randomUUID()}${ext}`);
+  const outputPath = path.join(TMP_DIR, `gl_out_${randomUUID()}.png`);
 
   try {
     await downloadFile(attachment.url, inputPath);

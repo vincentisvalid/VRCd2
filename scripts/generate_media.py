@@ -109,8 +109,39 @@ export default [
       { name: 'url', type: 3, description: 'Image URL or attachment', required: false }
     ],
     async execute(message, args) {
-      if (args.length < 2) return respond(message, { content: 'Usage: `.motivate "top text" "bottom text"`' });
-      return runMotivate(message, args[0], args[1]);
+      if (args.length === 0) return respond(message, { content: 'Usage: `.motivate <text>` or `.motivate <top> | <bottom>`' });
+      const commandName = 'motivate';
+      const activePrefix = message.content.startsWith('.') ? '.' : '/';
+      const rawText = message.content.slice(activePrefix.length + commandName.length).trim();
+      
+      let topText = '';
+      let bottomText = '';
+      
+      if (rawText.includes('|')) {
+        const parts = rawText.split('|');
+        topText = parts[0].trim();
+        bottomText = parts[1].trim();
+      } else if (rawText.includes(',')) {
+        const parts = rawText.split(',');
+        topText = parts[0].trim();
+        bottomText = parts[1].trim();
+      } else {
+        const words = rawText.split(/\\s+/).filter(Boolean);
+        if (words.length === 1) {
+          topText = words[0];
+          bottomText = '';
+        } else {
+          const half = Math.ceil(words.length / 2);
+          topText = words.slice(0, half).join(' ');
+          bottomText = words.slice(half).join(' ');
+        }
+      }
+      
+      // Clean quotes
+      topText = topText.replace(/^["']|["']$/g, '');
+      bottomText = bottomText.replace(/^["']|["']$/g, '');
+      
+      return runMotivate(message, topText, bottomText);
     },
     async executeSlash(interaction) {
       await interaction.deferReply();
@@ -1013,10 +1044,11 @@ async function runSpeechBubble(ctx) {
     g.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
     g.fill();
 
+    // Fix speech bubble tail pointing up correctly
     g.beginPath();
-    g.moveTo(cx - 20, 0);
-    g.lineTo(cx + 20, 0);
-    g.lineTo(cx - 5, headerHeight * 0.65);
+    g.moveTo(cx - 20, cy - ry + 5);
+    g.lineTo(cx + 20, cy - ry + 5);
+    g.lineTo(cx - 15, 0);
     g.closePath();
     g.fill();
 
@@ -1055,8 +1087,9 @@ async function runMotivate(ctx, topText, bottomText) {
     const { createCanvas, loadImage } = await import('canvas');
     const img = await loadImage(inputPath);
 
-    const borderW = 80;
-    const borderH = 150;
+    // Responsive design scaling
+    const borderW = Math.max(60, Math.round(img.width * 0.1));
+    const borderH = Math.max(160, Math.round(img.height * 0.22));
     const w = img.width + borderW;
     const h = img.height + borderH;
 
@@ -1069,8 +1102,8 @@ async function runMotivate(ctx, topText, bottomText) {
 
     // Draw inner white frame box
     g.strokeStyle = '#ffffff';
-    g.lineWidth = 3;
-    g.strokeRect(borderW / 2 - 5, borderW / 2 - 5, img.width + 10, img.height + 10);
+    g.lineWidth = Math.max(2, Math.round(w * 0.003));
+    g.strokeRect(borderW / 2 - 4, borderW / 2 - 4, img.width + 8, img.height + 8);
 
     // Draw original image
     g.drawImage(img, borderW / 2, borderW / 2, img.width, img.height);
@@ -1080,13 +1113,17 @@ async function runMotivate(ctx, topText, bottomText) {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
 
-    // Top Header
-    g.font = `bold ${Math.max(22, Math.round(w * 0.045))}px Georgia, serif`;
-    g.fillText(topText.toUpperCase(), w / 2, h - 90);
+    // Top Header (Title)
+    const titleSize = Math.max(20, Math.round(w * 0.05));
+    g.font = `bold ${titleSize}px Georgia, serif`;
+    const titleY = img.height + borderW/2 + Math.round((borderH - borderW/2) * 0.35);
+    g.fillText(topText.toUpperCase(), w / 2, titleY);
 
-    // Bottom Subtext
-    g.font = `italic ${Math.max(14, Math.round(w * 0.024))}px Georgia, serif`;
-    g.fillText(bottomText, w / 2, h - 45);
+    // Bottom Subtext (Subtitle)
+    const subSize = Math.max(12, Math.round(w * 0.025));
+    g.font = `italic ${subSize}px Georgia, serif`;
+    const subY = img.height + borderW/2 + Math.round((borderH - borderW/2) * 0.7);
+    g.fillText(bottomText, w / 2, subY);
 
     const buffer = canvas.toBuffer('image/png');
     fs.writeFileSync(outputPath, buffer);
@@ -1868,4 +1905,4 @@ async function runGlitchEffect(ctx) {
 with open(media_js_path, 'w', encoding='utf-8') as f:
     f.write(content)
 
-print('[Generator] Compiled and saved premium completed media.js with all 36 filters.')
+print('[Generator] Compiled and saved speechbubble + motivate upgrades.')

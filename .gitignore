@@ -10,6 +10,9 @@ node_modules/
 /tmp/
 .env
 
+# Auto-downloaded binaries (yt-dlp fetched at runtime)
+/bin/
+
 # Database backups and locks
 /data/*.json
 /data/*.sqlite

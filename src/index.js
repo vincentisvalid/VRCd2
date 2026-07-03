@@ -59,6 +59,11 @@ for (const file of commandFiles) {
     const module = await import(fileUrl);
     const cmdList = module.default;
     
+    if (module.initStandingPrompts) {
+      module.initStandingPrompts(client);
+      console.log(`[AI Engine] Initialized standing prompts scheduler loop from ${file}.`);
+    }
+    
     if (Array.isArray(cmdList)) {
       for (const cmd of cmdList) {
         cmd.sourceFile = file;
@@ -202,10 +207,15 @@ client.on('messageCreate', async message => {
   const command = client.commands.get(commandName) || client.aliases.get(commandName);
   if (!command) return;
 
+  const startTime = Date.now();
+  console.log(`[Command Executing] [Prefix] [Category: ${command.category || 'General'}] user=${message.author.tag} (${message.author.id}) guild=${message.guild ? `${message.guild.name} (${message.guild.id})` : 'DM'} command=${commandName} args=[${args.join(', ')}]`);
   try {
     await command.execute(message, args, client);
+    const duration = Date.now() - startTime;
+    console.log(`[Command Success] [Prefix] [Category: ${command.category || 'General'}] command=${commandName} duration=${duration}ms`);
   } catch (err) {
-    console.error(`[Command Error] Failed executing prefix command ${commandName}:`, err);
+    const duration = Date.now() - startTime;
+    console.error(`[Command Error] [Prefix] [Category: ${command.category || 'General'}] command=${commandName} duration=${duration}ms:`, err);
     message.reply({ content: 'An unexpected exception occurred while executing this command. Logs generated.' }).catch(() => {});
   }
 });
@@ -219,10 +229,15 @@ client.on('interactionCreate', async interaction => {
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
 
+  const startTime = Date.now();
+  console.log(`[Command Executing] [Slash] [Category: ${command.category || 'General'}] user=${interaction.user.tag} (${interaction.user.id}) guild=${interaction.guild ? `${interaction.guild.name} (${interaction.guild.id})` : 'DM'} command=${interaction.commandName}`);
   try {
     await command.executeSlash(interaction, client);
+    const duration = Date.now() - startTime;
+    console.log(`[Command Success] [Slash] [Category: ${command.category || 'General'}] command=${interaction.commandName} duration=${duration}ms`);
   } catch (err) {
-    console.error(`[Interaction Error] Slash Command ${interaction.commandName} failed:`, err);
+    const duration = Date.now() - startTime;
+    console.error(`[Command Error] [Slash] [Category: ${command.category || 'General'}] command=${interaction.commandName} duration=${duration}ms:`, err);
     const options = { content: 'Failed to process interaction request.', ephemeral: true };
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp(options).catch(() => {});

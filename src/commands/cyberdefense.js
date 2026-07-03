@@ -1,7 +1,9 @@
 import { AttachmentBuilder, PermissionFlagsBits } from 'discord.js';
 import axios from 'axios';
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { db } from '../database/db.js';
 import { respond, buildEmbed, downloadFile } from '../utils/helpers.js';
@@ -397,9 +399,35 @@ export default [
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
         return respond(interaction, { content: '❌ Manage Roles required.', ephemeral: true });
       }
+      await interaction.deferReply();
       const targetUser = interaction.options.getUser('user');
       const reason = interaction.options.getString('reason') || 'No reason provided';
       return runQuarantine(interaction, targetUser, reason);
+    }
+  },
+  {
+    name: 'unquarantine',
+    description: 'Restore a quarantined user to their previously held roles.',
+    category: 'CyberDefense',
+    aliases: ['unisolate'],
+    options: [
+      { name: 'user', type: 6, description: 'User to restore', required: true }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        return respond(message, { content: '❌ Manage Roles required.' });
+      }
+      const targetUser = message.mentions.users.first();
+      if (!targetUser) return respond(message, { content: 'Please mention a user.' });
+      return runUnquarantine(message, targetUser);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        return respond(interaction, { content: '❌ Manage Roles required.', ephemeral: true });
+      }
+      await interaction.deferReply();
+      const targetUser = interaction.options.getUser('user');
+      return runUnquarantine(interaction, targetUser);
     }
   },
   {
@@ -421,6 +449,7 @@ export default [
       if (!interaction.member.permissions.has(PermissionFlagsBits.ViewAuditLog)) {
         return respond(interaction, { content: '❌ View Audit Log permissions required.', ephemeral: true });
       }
+      await interaction.deferReply();
       const limit = interaction.options.getInteger('limit') || 5;
       return runAuditLog(interaction, limit);
     }
@@ -690,20 +719,86 @@ async function runReminder(ctx, timeStr, remindMsg, client) {
   return respond(ctx, { embeds: [buildEmbed('Reminder Scheduled', `I will remind you in **${timeStr}** about:\n*${remindMsg}*`, [], 0x32cd32)] });
 }
 
+// Safe recursive-descent arithmetic evaluator (no eval/Function, no code execution surface).
+// Grammar: expr := term (('+'|'-') term)* ; term := factor (('*'|'/') factor)* ;
+// factor := NUMBER | '(' expr ')' | ('+'|'-') factor
+function evaluateExpression(clean) {
+  let pos = 0;
+
+  function peek() { return clean[pos]; }
+
+  function parseNumber() {
+    const start = pos;
+    while (pos < clean.length && /[0-9.]/.test(clean[pos])) pos++;
+    if (pos === start) throw new Error('Expected number');
+    const numStr = clean.slice(start, pos);
+    if ((numStr.match(/\./g) || []).length > 1) throw new Error('Malformed number');
+    return parseFloat(numStr);
+  }
+
+  function parseFactor() {
+    if (peek() === '+' ) { pos++; return parseFactor(); }
+    if (peek() === '-') { pos++; return -parseFactor(); }
+    if (peek() === '(') {
+      pos++;
+      const value = parseExpr();
+      if (peek() !== ')') throw new Error('Mismatched parentheses');
+      pos++;
+      return value;
+    }
+    return parseNumber();
+  }
+
+  function parseTerm() {
+    let value = parseFactor();
+    while (peek() === '*' || peek() === '/') {
+      const op = clean[pos];
+      pos++;
+      const rhs = parseFactor();
+      if (op === '/') {
+        if (rhs === 0) throw new Error('Division by zero');
+        value /= rhs;
+      } else {
+        value *= rhs;
+      }
+    }
+    return value;
+  }
+
+  function parseExpr() {
+    let value = parseTerm();
+    while (peek() === '+' || peek() === '-') {
+      const op = clean[pos];
+      pos++;
+      const rhs = parseTerm();
+      value = op === '+' ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+
+  const result = parseExpr();
+  if (pos !== clean.length) throw new Error('Unexpected trailing characters');
+  return result;
+}
+
 // 7. Calculate
 function runCalculate(ctx, expr) {
-  // STRICT Regex sanitize
+  if (expr.length > 200) {
+    return respond(ctx, { content: '❌ Expression too long (max 200 characters).' });
+  }
+
   const clean = expr.replace(/\s+/g, '');
   if (!/^[0-9+\-*/().]+$/.test(clean)) {
     return respond(ctx, { content: '❌ Security rejection: Mathematical expression contains non-numeric strings.' });
   }
 
   try {
-    // Safe execution of sanitized numbers & operators
-    const result = new Function(`return (${clean})`)();
+    // Evaluated via a hand-rolled parser — never passes user input to Function/eval.
+    const result = evaluateExpression(clean);
+    if (!Number.isFinite(result)) throw new Error('Result out of range');
     return respond(ctx, { embeds: [buildEmbed('Calculator Output', `Expression: \`${expr}\`\nResult: **${result}**`, [], 0x00ffcc)] });
   } catch (err) {
-    return respond(ctx, { content: 'Math syntax error in expression evaluation.' });
+    return respond(ctx, { content: `Math syntax error: ${err.message}` });
   }
 }
 
@@ -727,9 +822,10 @@ async function runServerInfo(ctx) {
 
 // 9. Avatar Compare side-by-side using Canvas
 async function runAvatarCompare(ctx, u1, u2) {
-  const p1Path = path.join(TMP_DIR, `av1_${Date.now()}.png`);
-  const p2Path = path.join(TMP_DIR, `av2_${Date.now()}.png`);
-  const outPath = path.join(TMP_DIR, `compare_${Date.now()}.png`);
+  const jobId = randomUUID();
+  const p1Path = path.join(TMP_DIR, `av1_${jobId}.png`);
+  const p2Path = path.join(TMP_DIR, `av2_${jobId}.png`);
+  const outPath = path.join(TMP_DIR, `compare_${jobId}.png`);
 
   try {
     const { createCanvas, loadImage } = await import('canvas');
@@ -737,20 +833,17 @@ async function runAvatarCompare(ctx, u1, u2) {
     const u1Url = u1.displayAvatarURL({ extension: 'png', size: 256 });
     const u2Url = u2.displayAvatarURL({ extension: 'png', size: 256 });
 
-    await downloadFile(u1Url, p1Path);
-    await downloadFile(u2Url, p2Path);
+    await Promise.all([downloadFile(u1Url, p1Path), downloadFile(u2Url, p2Path)]);
 
     const canvas = createCanvas(512, 256);
     const g = canvas.getContext('2d');
 
-    const img1 = await loadImage(p1Path);
-    const img2 = await loadImage(p2Path);
+    const [img1, img2] = await Promise.all([loadImage(p1Path), loadImage(p2Path)]);
 
     g.drawImage(img1, 0, 0, 256, 256);
     g.drawImage(img2, 256, 0, 256, 256);
 
-    // Save
-    fs.writeFileSync(outPath, canvas.toBuffer());
+    await fsp.writeFile(outPath, canvas.toBuffer());
 
     const file = new AttachmentBuilder(outPath, { name: 'avatar_comparison.png' });
     const embed = buildEmbed('Avatar Side-by-Side', `Comparing avatars of **${u1.username}** and **${u2.username}**`);
@@ -762,9 +855,7 @@ async function runAvatarCompare(ctx, u1, u2) {
     console.error('[Avatar Compare Error]:', err.message);
     await respond(ctx, { content: 'Failed to process canvas avatar compilation.' });
   } finally {
-    if (fs.existsSync(p1Path)) fs.unlinkSync(p1Path);
-    if (fs.existsSync(p2Path)) fs.unlinkSync(p2Path);
-    if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+    await Promise.all([p1Path, p2Path, outPath].map(p => fsp.unlink(p).catch(() => {})));
   }
 }
 
@@ -828,12 +919,17 @@ async function runLyrics(ctx, query) {
 
     if (!d || !d.lyrics) throw new Error('Lyrics search returned empty index.');
 
+    const MAX_FOLLOWUP_CHUNKS = 4;
     const chunks = d.lyrics.match(/[\s\S]{1,1800}/g) || [d.lyrics];
     const embed = buildEmbed(`Lyrics: ${d.title} (${d.author})`, chunks[0]);
     await respond(ctx, { embeds: [embed] });
 
-    for (let i = 1; i < chunks.length; i++) {
-      if (ctx.channel) await ctx.channel.send({ content: chunks[i] });
+    const followups = chunks.slice(1, 1 + MAX_FOLLOWUP_CHUNKS);
+    for (const chunk of followups) {
+      if (ctx.channel) await ctx.channel.send({ content: chunk }).catch(() => {});
+    }
+    if (chunks.length > 1 + MAX_FOLLOWUP_CHUNKS && ctx.channel) {
+      await ctx.channel.send({ content: '*(lyrics truncated — too long to post in full)*' }).catch(() => {});
     }
   } catch (_) {
     // fallback
@@ -854,7 +950,7 @@ async function setSlowmode(ctx, sec) {
 
 // 14. QR Code Generator
 async function runQR(ctx, text) {
-  const dest = path.join(TMP_DIR, `qr_${Date.now()}.png`);
+  const dest = path.join(TMP_DIR, `qr_${randomUUID()}.png`);
   try {
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(text)}`;
     await downloadFile(url, dest);
@@ -867,7 +963,7 @@ async function runQR(ctx, text) {
   } catch (err) {
     await respond(ctx, { content: 'Failed to request QR Code assets.' });
   } finally {
-    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    await fsp.unlink(dest).catch(() => {});
   }
 }
 
@@ -887,17 +983,17 @@ async function runBackup(ctx) {
     }))
   };
 
-  const backupPath = path.join(TMP_DIR, `backup_${channel.name}_${Date.now()}.json`);
-  fs.writeFileSync(backupPath, JSON.stringify(backup, null, 2), 'utf-8');
+  const backupPath = path.join(TMP_DIR, `backup_${randomUUID()}.json`);
 
   try {
+    await fsp.writeFile(backupPath, JSON.stringify(backup, null, 2), 'utf-8');
     const file = new AttachmentBuilder(backupPath, { name: `channel_settings_backup.json` });
     const embed = buildEmbed('Channel Serialized', 'Generated configuration and permissions JSON database backup.');
     await respond(ctx, { embeds: [embed], files: [file] });
   } catch (err) {
     await respond(ctx, { content: 'Failed to compile configuration backup.' });
   } finally {
-    if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+    await fsp.unlink(backupPath).catch(() => {});
   }
 }
 
@@ -1059,9 +1155,32 @@ async function runCheckPerms(ctx) {
 // 21. Quarantine compromised accounts
 async function runQuarantine(ctx, targetUser, reason) {
   const guild = ctx.guild;
-  const member = await guild.members.fetch(targetUser.id).catch(() => null);
+  const invokerId = ctx.author ? ctx.author.id : ctx.user.id;
 
+  if (targetUser.id === invokerId) {
+    return respond(ctx, { content: '❌ You cannot quarantine yourself.' });
+  }
+  if (guild.members.me && targetUser.id === guild.members.me.id) {
+    return respond(ctx, { content: '❌ Cannot quarantine the bot.' });
+  }
+  if (targetUser.id === guild.ownerId) {
+    return respond(ctx, { content: '❌ Cannot quarantine the server owner.' });
+  }
+
+  const member = await guild.members.fetch(targetUser.id).catch(() => null);
   if (!member) return respond(ctx, { content: 'User not found in server.' });
+
+  const invokerMember = await guild.members.fetch(invokerId).catch(() => null);
+  const botMember = guild.members.me;
+
+  // Role-hierarchy checks: invoker and bot must both outrank the target.
+  if (invokerMember && invokerMember.id !== guild.ownerId &&
+      invokerMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
+    return respond(ctx, { content: '❌ You cannot quarantine a user with an equal or higher role than you.' });
+  }
+  if (botMember && botMember.roles.highest.comparePositionTo(member.roles.highest) <= 0) {
+    return respond(ctx, { content: '❌ My highest role must be above the target\'s highest role to quarantine them.' });
+  }
 
   try {
     let quarantineRole = guild.roles.cache.find(r => r.name === 'Quarantined');
@@ -1075,6 +1194,7 @@ async function runQuarantine(ctx, targetUser, reason) {
 
     const roleIds = member.roles.cache.filter(r => r.id !== guild.id).map(r => r.id);
     db.jails.set(`quarantine_${targetUser.id}`, {
+      guildId: guild.id,
       roles: roleIds,
       reason,
       timestamp: Date.now()
@@ -1088,13 +1208,55 @@ async function runQuarantine(ctx, targetUser, reason) {
 
     const embed = buildEmbed(
       '☣️ Account Quarantined',
-      `**User**: ${targetUser}\n**Reason**: ${reason}\n\n*All server permissions revoked. Account isolated.*`,
+      `**User**: ${targetUser}\n**Reason**: ${reason}\n\n*All server permissions revoked. Account isolated. Use \`.unquarantine\` to restore.*`,
       [],
       0x8b0000
     );
     return respond(ctx, { embeds: [embed] });
   } catch (err) {
     return respond(ctx, { content: `Quarantine failed: ${err.message}` });
+  }
+}
+
+// 21b. Restore a previously quarantined user's roles
+async function runUnquarantine(ctx, targetUser) {
+  const guild = ctx.guild;
+  const record = db.jails.get(`quarantine_${targetUser.id}`);
+
+  if (!record || record.guildId !== guild.id) {
+    return respond(ctx, { content: `No quarantine record found for ${targetUser}.` });
+  }
+
+  const member = await guild.members.fetch(targetUser.id).catch(() => null);
+  if (!member) {
+    db.jails.delete(`quarantine_${targetUser.id}`);
+    return respond(ctx, { content: 'User not found in server; quarantine record cleared.' });
+  }
+
+  try {
+    const quarantineRole = guild.roles.cache.find(r => r.name === 'Quarantined');
+    if (quarantineRole && member.roles.cache.has(quarantineRole.id)) {
+      await member.roles.remove(quarantineRole).catch(() => {});
+    }
+
+    for (const roleId of record.roles) {
+      const role = guild.roles.cache.get(roleId);
+      if (role && role.editable) {
+        await member.roles.add(role).catch(() => {});
+      }
+    }
+
+    db.jails.delete(`quarantine_${targetUser.id}`);
+
+    const embed = buildEmbed(
+      '✅ Quarantine Lifted',
+      `**User**: ${targetUser}\n\n*Previously held roles restored where still available.*`,
+      [],
+      0x32cd32
+    );
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Unquarantine failed: ${err.message}` });
   }
 }
 

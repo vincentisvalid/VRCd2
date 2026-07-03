@@ -205,6 +205,41 @@ export default [
       const reason = interaction.options.getString('reason') || 'No reason provided';
       return runWarn(interaction, targetUser, reason);
     }
+  },
+  {
+    name: 'purge',
+    description: 'Bulk delete a number of recent messages from this channel.',
+    category: 'Moderation',
+    aliases: ['clear', 'prune'],
+    options: [
+      {
+        name: 'num',
+        type: 4, // Integer
+        description: 'Number of messages to delete (1-100)',
+        required: true
+      }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        return respond(message, { content: 'You do not have Manage Messages permission.' });
+      }
+      const num = parseInt(args[0], 10);
+      if (!Number.isInteger(num) || num < 1 || num > 100) {
+        return respond(message, { content: 'Usage: `.purge <num>` where num is between 1 and 100.' });
+      }
+      return runPurge(message, num);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        return respond(interaction, { content: 'You do not have Manage Messages permission.', ephemeral: true });
+      }
+      const num = interaction.options.getInteger('num');
+      if (num < 1 || num > 100) {
+        return respond(interaction, { content: 'Number of messages must be between 1 and 100.', ephemeral: true });
+      }
+      await interaction.deferReply({ ephemeral: true });
+      return runPurge(interaction, num);
+    }
   }
 ];
 
@@ -366,4 +401,43 @@ async function runWarn(ctx, targetUser, reason) {
     0xff8c00
   );
   return respond(ctx, { embeds: [embed] });
+}
+
+// Helper: Purge (bulk delete) recent channel messages
+async function runPurge(ctx, num) {
+  const channel = ctx.channel;
+  const isInteraction = ctx.isInteraction || (ctx.deferred !== undefined && ctx.replied !== undefined);
+
+  const botMember = ctx.guild.members.me;
+  if (botMember && !channel.permissionsFor(botMember).has(PermissionFlagsBits.ManageMessages)) {
+    return respond(ctx, { content: 'I do not have Manage Messages permission in this channel.' });
+  }
+
+  try {
+    // Prefix invocations also remove the triggering command message itself; Discord
+    // caps bulkDelete at 100 messages per call regardless of path.
+    const amountToDelete = Math.min(isInteraction ? num : num + 1, 100);
+    // Passing `true` filters out messages older than 14 days instead of throwing,
+    // since Discord's bulk-delete API rejects any batch containing one.
+    const deleted = await channel.bulkDelete(amountToDelete, true);
+    const deletedCount = isInteraction ? deleted.size : Math.max(0, deleted.size - 1);
+
+    const embed = buildEmbed(
+      'Messages Purged',
+      `Deleted **${deletedCount}** message${deletedCount === 1 ? '' : 's'} from ${channel}.` +
+        (deletedCount < num ? '\n*Some messages were skipped (older than 14 days cannot be bulk-deleted).*' : ''),
+      [],
+      0x32cd32
+    );
+
+    if (isInteraction) {
+      return respond(ctx, { embeds: [embed] });
+    }
+    // The invoking message was already removed by bulkDelete, so reply() has nothing
+    // to attach to — send a fresh confirmation instead and auto-clean it shortly after.
+    const sent = await channel.send({ embeds: [embed] });
+    setTimeout(() => sent.delete().catch(() => {}), 5000);
+  } catch (err) {
+    return respond(ctx, { content: `Purge failed: ${err.message}` });
+  }
 }

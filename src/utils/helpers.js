@@ -44,17 +44,19 @@ export async function deleteTrigger(ctx) {
 /**
  * Downloads a file from a URL to a local destination path.
  */
-export async function downloadFile(url, destPath) {
+export async function downloadFile(url, destPath, timeoutMs = 10000) {
   const writer = fs.createWriteStream(destPath);
   const response = await axios({
     url,
     method: 'GET',
-    responseType: 'stream'
+    responseType: 'stream',
+    timeout: timeoutMs
   });
   response.data.pipe(writer);
   return new Promise((resolve, reject) => {
     writer.on('finish', resolve);
     writer.on('error', reject);
+    response.data.on('error', reject);
   });
 }
 
