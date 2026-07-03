@@ -171,6 +171,35 @@ npm run dev
 - `.qr <text>` - Builds custom downloadable QR codes.
 - `.backup-channel` - Compiles a JSON format structure settings backup.
 
+### 🎮 Gaming Utilities
+- `.mcstatus <ip>` - Ping a Minecraft server to check online status, player count, and MOTD.
+- `.steamprofile <id>` - Retrieve public steam profile summary statistics.
+- `.vrchatuser <username>` - Lookup public VRChat developer details or profile cards.
+- `.vrcworld <id>` - Query VRChat world index parameters.
+
+### 💻 Software Development
+- `.gitlookup <username>` - Lookup public information on a GitHub profile.
+- `.jsonformat <json>` - Pretty print and validate raw JSON text strings.
+- `.regexcheck <pattern> <text>` - Test regular expressions (regex) patterns against input strings.
+- `.requestcheck <url>` - Make a fast HTTP HEAD request to audit target latency and headers.
+
+### 🛡️ AntiNuke Shield
+- `.antinuke <on/off>` - Toggle the entire server anti-nuke module.
+- `.whitelist <add/remove> <@user>` - Whitelist a trusted administrator from anti-nuke triggers.
+- `.antinukelogs` - Retrieve recent AntiNuke intervention logs.
+
+### ⭐ Starboard
+- `.starboardsetup <#channel>` - Set up the Starboard channel for highlighting starred messages.
+- `.starboardlimit <count>` - Configure the star reaction count threshold required to highlight a message.
+
+### 🤡 Clownboard
+- `.clownboardsetup <#channel>` - Set up the Clownboard feed for funny or roasted messages.
+- `.clownboardlimit <count>` - Configure the clown reaction count threshold required to roast a message.
+
+### 📱 Social Media Alerts
+- `.twitchtrack <streamer> <#channel>` - Configure Twitch channel live stream notifications.
+- `.youtubetrack <channelid> <#channel>` - Configure YouTube channel video upload tracking notifications.
+
 ---
 
 ## 📄 LICENSE
