@@ -38,7 +38,7 @@ VRCd/
 │       ├── settings.js
 │       ├── roles.js
 │       ├── quotes.js
-│       └── bonus.js
+│       └── cyberdefense.js
 └── tmp/
 ```
 
@@ -141,6 +141,33 @@ npm run dev
 - `.mute <@user> <duration> [reason]` - Places an API timeout lock.
 - `.warn <@user> [reason]` - Increment warnings and logs to profile.
 - `.kick` / `.ban` - Gateway member exclusions.
+
+### 🛡️ CyberDefense & Intrusion Detection (IDS/IPS)
+- `.antispam <on/off>` - Toggle message rate-limiting (Intrusion Detection System) that auto-timeouts spammers.
+- `.raidmode <on/off>` - Toggle auto-kick policy on newly joining server members (Intrusion Prevention).
+- `.lockdown <on/off>` - Denial/restoration of SendMessages permissions for `@everyone` in the channel.
+- `.scanlinks` - Audits channel message logs for phishing domains or Nitro spam links.
+- `.checkperms` - Privilege auditor identifying users holding elevated admin permission overrides.
+- `.quarantine <@user> [reason]` - Strips roles and quarantines suspected compromised user accounts.
+- `.auditlog [limit]` - Retrieve recent administrative audit log events.
+- `.geolocate <ipv4>` - Resolves geographic information details for a targeted IPv4 address.
+
+### ⚙️ Utilities & Integrations
+- `.translate <lang> <text>` - Local translation engine.
+- `.weather <location>` - Meteorology reports for locations.
+- `.crypto <ticker>` - Price updates on major blockchain indices.
+- `.urban <term>` - Queries definition indices of slang phrases.
+- `.poll "Q" "O1" "O2"` - Custom component voting polls generator.
+- `.reminder <duration> <msg>` - Deploys database-backed timed notifications.
+- `.calculate <expr>` - Sanitized math equations evaluator.
+- `.serverinfo` - Guild parameters details indices.
+- `.avatar-compare <@u1> <@u2>` - Side-by-side avatar canvas comparers.
+- `.steamstatus` - Status reports for steam servers.
+- `.github <username>` - Profile lookups for developers.
+- `.lyrics <song>` - Retrieves scrollable text lyric blocks.
+- `.slowmode <seconds>` - Controls writing rate-limit for the active channel.
+- `.qr <text>` - Builds custom downloadable QR codes.
+- `.backup-channel` - Compiles a JSON format structure settings backup.
 
 ---
 
