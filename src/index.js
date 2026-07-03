@@ -18,28 +18,12 @@ if (!process.env.DISCORD_TOKEN) {
   console.error('[Engine Warning] DISCORD_TOKEN is missing in the environment variables.');
 }
 
-// Import Command Modules statically
-import helpCmds from './commands/help.js';
-import aiCmds from './commands/ai.js';
-import vrCmds from './commands/vr.js';
-import musicCmds from './commands/music.js';
-import mediaCmds from './commands/media.js';
-import embedsCmds from './commands/embeds.js';
-import moderationCmds from './commands/moderation.js';
-import userinfoCmds from './commands/userinfo.js';
-import adminCmds from './commands/admin.js';
-import voiceCmds from './commands/voice.js';
-import settingsCmds from './commands/settings.js';
-import rolesCmds from './commands/roles.js';
-import quotesCmds from './commands/quotes.js';
-import cyberdefenseCmds from './commands/cyberdefense.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 
-// Aggregate command lists
-const commandArrays = [
-  helpCmds, aiCmds, vrCmds, musicCmds, mediaCmds,
-  embedsCmds, moderationCmds, userinfoCmds, adminCmds,
-  voiceCmds, settingsCmds, rolesCmds, quotesCmds, cyberdefenseCmds
-];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Initialize Discord Client
 const client = new Client({
@@ -65,15 +49,28 @@ const client = new Client({
 client.commands = new Collection();
 client.aliases = new Collection();
 
-// Register commands to client collections
-for (const cmdArray of commandArrays) {
-  for (const cmd of cmdArray) {
-    client.commands.set(cmd.name, cmd);
-    if (cmd.aliases && cmd.aliases.length > 0) {
-      for (const alias of cmd.aliases) {
-        client.aliases.set(alias, cmd);
+// Dynamically load all command files in src/commands/
+const commandsDir = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsDir).filter(f => f.endsWith('.js'));
+
+for (const file of commandFiles) {
+  try {
+    const fileUrl = pathToFileURL(path.join(commandsDir, file)).href;
+    const module = await import(fileUrl);
+    const cmdList = module.default;
+    
+    if (Array.isArray(cmdList)) {
+      for (const cmd of cmdList) {
+        client.commands.set(cmd.name, cmd);
+        if (cmd.aliases && cmd.aliases.length > 0) {
+          for (const alias of cmd.aliases) {
+            client.aliases.set(alias, cmd);
+          }
+        }
       }
     }
+  } catch (err) {
+    console.error(`[Loader Error] Failed to import command file ${file}:`, err);
   }
 }
 
