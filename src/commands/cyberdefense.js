@@ -289,7 +289,7 @@ export default [
   {
     name: 'geolocate',
     description: 'Resolve geographical information from an IPv4 address.',
-    category: 'Bonus',
+    category: 'CyberDefense',
     aliases: ['iplookup', 'ip'],
     options: [
       { name: 'ip', type: 3, description: 'IPv4 Address to lookup', required: true }
@@ -301,6 +301,151 @@ export default [
     async executeSlash(interaction, client) {
       await interaction.deferReply();
       return runGeolocate(interaction, interaction.options.getString('ip'));
+    }
+  },
+  {
+    name: 'lockdown',
+    description: 'Restrict or restore SendMessages privileges for @everyone in the channel.',
+    category: 'CyberDefense',
+    aliases: ['lock'],
+    options: [
+      { name: 'state', type: 3, description: 'State: on or off', required: true }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+        return respond(message, { content: '❌ Manage Channels required.' });
+      }
+      if (args.length === 0) return respond(message, { content: 'Usage: `.lockdown <on/off>`' });
+      return runLockdown(message, args[0]);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+        return respond(interaction, { content: '❌ Manage Channels required.', ephemeral: true });
+      }
+      const state = interaction.options.getString('state');
+      return runLockdown(interaction, state);
+    }
+  },
+  {
+    name: 'raidmode',
+    description: 'Toggle strict auto-kick policy for newly joining accounts (Intrusion Prevention).',
+    category: 'CyberDefense',
+    aliases: ['antiraid'],
+    options: [
+      { name: 'state', type: 3, description: 'State: on or off', required: true }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return respond(message, { content: '❌ Administrator permissions required.' });
+      }
+      if (args.length === 0) return respond(message, { content: 'Usage: `.raidmode <on/off>`' });
+      return runRaidMode(message, args[0]);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return respond(interaction, { content: '❌ Administrator permissions required.', ephemeral: true });
+      }
+      const state = interaction.options.getString('state');
+      return runRaidMode(interaction, state);
+    }
+  },
+  {
+    name: 'scanlinks',
+    description: 'Audit channel history for suspected malware or phishing link threats.',
+    category: 'CyberDefense',
+    aliases: ['auditlinks'],
+    async execute(message, args, client) {
+      return runScanLinks(message);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runScanLinks(interaction);
+    }
+  },
+  {
+    name: 'checkperms',
+    description: 'Verify administrative privileges and detect overly permissive roles.',
+    category: 'CyberDefense',
+    aliases: ['auditperms'],
+    async execute(message, args, client) {
+      return runCheckPerms(message);
+    },
+    async executeSlash(interaction, client) {
+      await interaction.deferReply();
+      return runCheckPerms(interaction);
+    }
+  },
+  {
+    name: 'quarantine',
+    description: 'Isolate compromised users in a locked quarantine state.',
+    category: 'CyberDefense',
+    aliases: ['isolate'],
+    options: [
+      { name: 'user', type: 6, description: 'User to quarantine', required: true },
+      { name: 'reason', type: 3, description: 'Reason for quarantine', required: false }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        return respond(message, { content: '❌ Manage Roles required.' });
+      }
+      const targetUser = message.mentions.users.first();
+      if (!targetUser) return respond(message, { content: 'Please mention a user.' });
+      const reason = args.slice(1).join(' ') || 'No reason provided';
+      return runQuarantine(message, targetUser, reason);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        return respond(interaction, { content: '❌ Manage Roles required.', ephemeral: true });
+      }
+      const targetUser = interaction.options.getUser('user');
+      const reason = interaction.options.getString('reason') || 'No reason provided';
+      return runQuarantine(interaction, targetUser, reason);
+    }
+  },
+  {
+    name: 'auditlog',
+    description: 'Retrieve latest server audit log events for integrity reviews.',
+    category: 'CyberDefense',
+    aliases: ['logs'],
+    options: [
+      { name: 'limit', type: 4, description: 'Number of logs to fetch (max 10)', required: false }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.ViewAuditLog)) {
+        return respond(message, { content: '❌ View Audit Log permissions required.' });
+      }
+      const limit = args[0] ? parseInt(args[0]) : 5;
+      return runAuditLog(message, limit);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ViewAuditLog)) {
+        return respond(interaction, { content: '❌ View Audit Log permissions required.', ephemeral: true });
+      }
+      const limit = interaction.options.getInteger('limit') || 5;
+      return runAuditLog(interaction, limit);
+    }
+  },
+  {
+    name: 'antispam',
+    description: 'Toggle automatic message rate-limiting (Intrusion Detection System).',
+    category: 'CyberDefense',
+    aliases: ['ids'],
+    options: [
+      { name: 'state', type: 3, description: 'State: on or off', required: true }
+    ],
+    async execute(message, args, client) {
+      if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return respond(message, { content: '❌ Administrator permissions required.' });
+      }
+      if (args.length === 0) return respond(message, { content: 'Usage: `.antispam <on/off>`' });
+      return runAntiSpamToggle(message, args[0]);
+    },
+    async executeSlash(interaction, client) {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return respond(interaction, { content: '❌ Administrator permissions required.', ephemeral: true });
+      }
+      const state = interaction.options.getString('state');
+      return runAntiSpamToggle(interaction, state);
     }
   }
 ];
@@ -740,4 +885,201 @@ async function runGeolocate(ctx, ip) {
   } catch (err) {
     await respond(ctx, { content: `Failed to geolocate IP: ${err.message}` });
   }
+}
+
+// 17. Lockdown channel send message permissions
+async function runLockdown(ctx, state) {
+  const channel = ctx.channel;
+  const everyone = ctx.guild.roles.everyone;
+  const turnOn = state.toLowerCase() === 'on';
+
+  try {
+    await channel.permissionOverwrites.edit(everyone, {
+      SendMessages: !turnOn
+    });
+
+    const embed = buildEmbed(
+      turnOn ? '🔒 Channel Lockdown Activated' : '🔓 Channel Lockdown Released',
+      turnOn 
+        ? 'SendMessages permission stripped for @everyone in this channel.' 
+        : 'SendMessages permission restored for @everyone in this channel.',
+      [],
+      turnOn ? 0xff0000 : 0x00ff00
+    );
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Failed to execute lockdown: ${err.message}` });
+  }
+}
+
+// 18. Toggle RaidMode Auto-kick policy
+function runRaidMode(ctx, state) {
+  const guildId = ctx.guild.id;
+  const turnOn = state.toLowerCase() === 'on';
+  db.settings.set(`raidmode_${guildId}`, turnOn);
+
+  const embed = buildEmbed(
+    turnOn ? '🚨 Raid Mode ENABLED' : '🟢 Raid Mode DISABLED',
+    turnOn 
+      ? 'Intrusion Prevention active. Newly joining server members will be automatically kicked.' 
+      : 'Raid prevention deactivated. Normal server joining rules restored.',
+    [],
+    turnOn ? 0xff0000 : 0x00ff00
+  );
+  return respond(ctx, { embeds: [embed] });
+}
+
+// 19. Scan history for suspected malware or phishing link patterns
+async function runScanLinks(ctx) {
+  const channel = ctx.channel;
+  
+  try {
+    const messages = await channel.messages.fetch({ limit: 50 });
+    const suspiciousPatterns = [
+      /discord\.(gg|gift|free|nitro)/gi,
+      /dlscord/gi,
+      /steamc(o|0)mmunity/gi,
+      /bit\.ly/gi,
+      /tinyurl/gi,
+      /free-nitro/gi,
+      /gift-nitro/gi
+    ];
+
+    const flagged = [];
+    messages.forEach(msg => {
+      if (msg.author.bot) return;
+      const match = suspiciousPatterns.some(pattern => pattern.test(msg.content));
+      if (match) {
+        flagged.push({ author: msg.author, text: msg.content.slice(0, 100) });
+      }
+    });
+
+    if (flagged.length === 0) {
+      return respond(ctx, { embeds: [buildEmbed('Link Scan Complete', '🟢 Checked last 50 messages. Zero threats found.', [], 0x00ff00)] });
+    }
+
+    const threatList = flagged.map(f => `User: ${f.author} - *${f.text}*`).join('\n');
+    const embed = buildEmbed(
+      '⚠️ Security Audit Flagged Threats',
+      `Identified potential malicious or tracking links in recent messages:\n\n${threatList}`,
+      [],
+      0xffa500
+    );
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Link scanning failed: ${err.message}` });
+  }
+}
+
+// 20. Check Administrative Permission overrides
+async function runCheckPerms(ctx) {
+  const guild = ctx.guild;
+
+  try {
+    const highRiskUsers = [];
+    const members = await guild.members.fetch();
+
+    members.forEach(member => {
+      if (member.user.bot) return;
+      const hasAdmin = member.permissions.has(PermissionFlagsBits.Administrator);
+      const hasGuild = member.permissions.has(PermissionFlagsBits.ManageGuild);
+      const hasRoles = member.permissions.has(PermissionFlagsBits.ManageRoles);
+      
+      if (hasAdmin || hasGuild || hasRoles) {
+        const perms = [];
+        if (hasAdmin) perms.push('Administrator');
+        if (hasGuild) perms.push('Manage Server');
+        if (hasRoles) perms.push('Manage Roles');
+        highRiskUsers.push({ user: member.user, perms: perms.join(', ') });
+      }
+    });
+
+    const list = highRiskUsers.map(u => `• ${u.user} (${u.user.username}) - [${u.perms}]`).join('\n') || 'None';
+    const embed = buildEmbed(
+      '🛡️ Permission Privilege Audit',
+      `Identified non-bot users with elevated server permissions:\n\n${list}`,
+      [],
+      0x00ffff
+    );
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Permission check failed: ${err.message}` });
+  }
+}
+
+// 21. Quarantine compromised accounts
+async function runQuarantine(ctx, targetUser, reason) {
+  const guild = ctx.guild;
+  const member = await guild.members.fetch(targetUser.id).catch(() => null);
+
+  if (!member) return respond(ctx, { content: 'User not found in server.' });
+
+  try {
+    let quarantineRole = guild.roles.cache.find(r => r.name === 'Quarantined');
+    if (!quarantineRole) {
+      quarantineRole = await guild.roles.create({
+        name: 'Quarantined',
+        color: '#708090',
+        reason: 'Quarantine isolation role'
+      });
+    }
+
+    const roleIds = member.roles.cache.filter(r => r.id !== guild.id).map(r => r.id);
+    db.jails.set(`quarantine_${targetUser.id}`, {
+      roles: roleIds,
+      reason,
+      timestamp: Date.now()
+    });
+
+    const removable = member.roles.cache.filter(r => r.id !== guild.id && r.editable);
+    for (const [id, r] of removable) {
+      await member.roles.remove(r).catch(() => {});
+    }
+    await member.roles.add(quarantineRole);
+
+    const embed = buildEmbed(
+      '☣️ Account Quarantined',
+      `**User**: ${targetUser}\n**Reason**: ${reason}\n\n*All server permissions revoked. Account isolated.*`,
+      [],
+      0x8b0000
+    );
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Quarantine failed: ${err.message}` });
+  }
+}
+
+// 22. Audit Log fetching
+async function runAuditLog(ctx, limit) {
+  const guild = ctx.guild;
+  
+  try {
+    const logs = await guild.fetchAuditLogs({ limit });
+    const entries = logs.entries.map((entry, idx) => {
+      const time = `<t:${Math.floor(entry.createdTimestamp / 1000)}:R>`;
+      return `${idx + 1}. **${entry.executor.username}** performed **${entry.action}** on target **${entry.targetId}** (${time})`;
+    }).join('\n') || 'No logs captured.';
+
+    const embed = buildEmbed('📋 Administrative Audit Log Feed', entries, [], 0x4682b4);
+    return respond(ctx, { embeds: [embed] });
+  } catch (err) {
+    return respond(ctx, { content: `Failed to retrieve audit logs: ${err.message}` });
+  }
+}
+
+// 23. AntiSpam IDS toggles
+function runAntiSpamToggle(ctx, state) {
+  const guildId = ctx.guild.id;
+  const turnOn = state.toLowerCase() === 'on';
+  db.settings.set(`antispam_${guildId}`, turnOn);
+
+  const embed = buildEmbed(
+    turnOn ? '🛡️ Intrusion Detection System: Antispam ACTIVE' : '🟢 Antispam IDS INACTIVE',
+    turnOn 
+      ? 'Rate limit watchers deployed. Mutes will apply automatically to spammers.' 
+      : 'Intrusion Detection System offline.',
+    [],
+    turnOn ? 0x00ffcc : 0xffa500
+  );
+  return respond(ctx, { embeds: [embed] });
 }

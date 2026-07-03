@@ -32,13 +32,13 @@ import voiceCmds from './commands/voice.js';
 import settingsCmds from './commands/settings.js';
 import rolesCmds from './commands/roles.js';
 import quotesCmds from './commands/quotes.js';
-import bonusCmds from './commands/bonus.js';
+import cyberdefenseCmds from './commands/cyberdefense.js';
 
 // Aggregate command lists
 const commandArrays = [
   helpCmds, aiCmds, vrCmds, musicCmds, mediaCmds,
   embedsCmds, moderationCmds, userinfoCmds, adminCmds,
-  voiceCmds, settingsCmds, rolesCmds, quotesCmds, bonusCmds
+  voiceCmds, settingsCmds, rolesCmds, quotesCmds, cyberdefenseCmds
 ];
 
 // Initialize Discord Client
@@ -142,11 +142,46 @@ async function triggerReminder(reminder) {
   db.reminders.set('active', current.filter(r => r.id !== reminder.id));
 }
 
+const spamTrackers = new Map();
+
 // ----------------------------------------------------------------
 // messageCreate Event (Prefix parsing)
 // ----------------------------------------------------------------
 client.on('messageCreate', async message => {
   if (message.author.bot || message.system) return;
+
+  // Intrusion Detection System: AntiSpam Watcher
+  if (message.guild) {
+    const antiSpamActive = db.settings.get(`antispam_${message.guild.id}`);
+    if (antiSpamActive === true) {
+      const userId = message.author.id;
+      const now = Date.now();
+      
+      if (!spamTrackers.has(userId)) {
+        spamTrackers.set(userId, []);
+      }
+      
+      const timestamps = spamTrackers.get(userId);
+      timestamps.push(now);
+      
+      const recentTimestamps = timestamps.filter(t => now - t < 4000);
+      spamTrackers.set(userId, recentTimestamps);
+      
+      if (recentTimestamps.length > 5) {
+        console.log(`[IDS Alert] Flagged spammer ${message.author.tag} in guild ${message.guild.name}`);
+        await message.delete().catch(() => {});
+        
+        const member = await message.guild.members.fetch(userId).catch(() => null);
+        if (member && member.moderatable) {
+          await member.timeout(10 * 60 * 1000, 'Muted by Intrusion Detection System (AntiSpam)').catch(() => {});
+          await message.channel.send({
+            content: `🛡️ **IDS Intrusion Alert**: <@${userId}> has been automatically muted for 10 minutes for rate-limit spam violations.`
+          }).catch(() => {});
+        }
+        return;
+      }
+    }
+  }
 
   // Resolve prefix override hierarchy
   const userPrefix = db.settings.get(`prefix_user_${message.author.id}`);
@@ -288,6 +323,18 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 // ----------------------------------------------------------------
 client.on('guildMemberAdd', async member => {
   const guild = member.guild;
+
+  // Intrusion Prevention: Raid Mode kick
+  const raidModeActive = db.settings.get(`raidmode_${guild.id}`);
+  if (raidModeActive === true) {
+    console.log(`[RaidMode] Automatically kicking joining user ${member.user.tag}...`);
+    await member.send({ content: `⚠️ **Security Alert**: The server **${guild.name}** is currently locked down. You have been auto-kicked as an anti-intrusion prevention measure. Please try joining again later.` }).catch(() => {});
+    await member.kick('Auto-kick triggered by active Guild RaidMode intrusion prevention.').catch(err => {
+      console.error(`[RaidMode Error] Failed to kick user:`, err.message);
+    });
+    return;
+  }
+
   const mappedRoles = db.autoroles.get(guild.id, []);
 
   if (mappedRoles.length > 0) {
