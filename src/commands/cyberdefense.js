@@ -547,36 +547,49 @@ async function runWeather(ctx, loc) {
 
 // 3. Crypto
 async function runCrypto(ctx, ticker) {
-  const cleanTicker = ticker.toLowerCase();
-  // Map standard tickers to CoinGecko IDs
-  const mappings = {
-    btc: 'bitcoin',
-    eth: 'ethereum',
-    sol: 'solana',
-    doge: 'dogecoin',
-    ada: 'cardano',
-    xrp: 'ripple'
-  };
-  const id = mappings[cleanTicker] || cleanTicker;
+  const apiKey = process.env.FREECRYPTOAPI_KEY;
+
+  if (!apiKey) {
+    const errorEmbed = buildEmbed(
+      'FreeCryptoAPI Key Required',
+      `Please set your \`FREECRYPTOAPI_KEY\` in your \`.env\` file to use this command.\n\n*Get a free API key at [freecryptoapi.com](https://freecryptoapi.com).*`,
+      [],
+      0xffa500
+    );
+    return respond(ctx, { embeds: [errorEmbed] });
+  }
+
+  const symbol = ticker.toUpperCase();
 
   try {
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd&include_24hr_change=true`;
-    const res = await axios.get(url, { timeout: 5000 });
-    const data = res.data[id];
+    const url = `https://api.freecryptoapi.com/v1/getData?symbol=${encodeURIComponent(symbol)}`;
+    const res = await axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      },
+      timeout: 5000
+    });
     
-    if (!data) throw new Error('Asset ticker not found on indices.');
+    const data = res.data;
+    if (!data || !data.price) throw new Error('Asset ticker not found on index.');
 
-    const price = data.usd;
-    const change = data.usd_24h_change || 0;
+    const price = data.price;
+    const change = data.change_24h || 0;
     const emoji = change >= 0 ? '📈' : '📉';
 
+    const fields = [
+      { name: 'USD Value', value: `$${price.toLocaleString()}`, inline: true },
+      { name: '24h Change', value: `${emoji} ${change.toFixed(2)}%`, inline: true }
+    ];
+
+    if (data.market_cap) {
+      fields.push({ name: 'Market Cap', value: `$${data.market_cap.toLocaleString()}`, inline: true });
+    }
+
     const embed = buildEmbed(
-      `Crypto: ${ticker.toUpperCase()}`,
-      `Market price indexing metrics via CoinGecko.`,
-      [
-        { name: 'USD Value', value: `$${price.toLocaleString()}`, inline: true },
-        { name: '24h Change', value: `${emoji} ${change.toFixed(2)}%`, inline: true }
-      ],
+      `Crypto: ${symbol}`,
+      `Market price indexing metrics via FreeCryptoAPI.`,
+      fields,
       change >= 0 ? 0x00ff00 : 0xff0000
     );
     await respond(ctx, { embeds: [embed] });
