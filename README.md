@@ -106,6 +106,8 @@ src/
 │   ├── context.js           # CommandContext — the hybrid transport unifier
 │   ├── options.js           # declarative option schema → prefix parser + slash getters
 │   ├── dispatcher.js        # gates: guild / admin-role / owner / perms / cooldown
+│   ├── components.js        # UI kit: confirm dialogs, modal popups, pagination
+│   ├── componentRouter.js   # restart-proof button/select routing (polls, player)
 │   ├── loader.js            # recursive command collection loader
 │   ├── registrar.js         # option schema → SlashCommandBuilder manifest
 │   ├── prefixes.js          # user → guild → global → default prefix chain
@@ -135,6 +137,15 @@ options: [
 - **Slash path** (`interactionCreate`): the same schema is materialised through the interaction's typed getters.
 
 Both paths construct an identical `CommandContext` (`ctx.reply/edit/defer/getOption/attachments`) and pass through one dispatcher enforcing guild scoping, the **immutable Admin Utils role gate** (IDs frozen in `config.json`), permissions, and cooldowns, with every failure converted into a graceful error embed (tracebacks go to the console, never to chat).
+
+### The interactive UI layer
+
+Every high-touch flow uses native Discord components instead of "type your answer in chat", built from a shared kit (`src/core/components.js`: confirm dialogs, modal popups, button pagination) with varied human phrasing (`src/utils/humanize.js`):
+
+- **Modal popups** — `.vrsetup` (SteamID64), `.fmsetup` (all three platforms — Spotify credentials are typed into a private popup and never enter channel history), and the `.sendembed` builder (title/body/colour/image with a private preview and Send / Edit / Discard buttons).
+- **Select menus** — `.help` is a live category browser; `.autorole` uses a native role picker.
+- **Confirm dialogs** — `.ban`, `.kick`, and `.jail` ask for a styled button confirmation before acting.
+- **Persistent buttons** — `.poll` votes (live tallies, retract/switch, End-poll control) and the `.play` control deck (pause/resume, skip, stop) route through `src/core/componentRouter.js` by `customId` namespace, so they keep working **across bot restarts**; short-lived wizards use local collectors instead.
 
 ### The media pipeline
 

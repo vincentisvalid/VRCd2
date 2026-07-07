@@ -131,6 +131,17 @@ class GuildPlayer {
     return true;
   }
 
+  get isPaused() {
+    return this.audioPlayer.state.status === AudioPlayerStatus.Paused;
+  }
+
+  /** Skips the current track (queue advance rides on the Idle transition). */
+  skip() {
+    const skipped = this.current;
+    this.audioPlayer.stop(true);
+    return skipped;
+  }
+
   destroy() {
     clearTimeout(this.idleTimer);
     this.queue = [];

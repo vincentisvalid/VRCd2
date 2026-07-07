@@ -1,41 +1,121 @@
 /**
- * .help — dynamic category-sorted command index.
+ * .help — interactive command browser.
  *
- * Scans the live command collection at call time, so newly added modules
- * appear automatically. `.help <command>` renders a detail card with usage,
- * arguments, and the alias map.
+ * The index view is a living menu: a category select box plus an overview
+ * button, scanning the live command collection at call time so new modules
+ * appear automatically. `.help <command>` still renders a static detail
+ * card with usage, arguments, and the alias map.
  */
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  MessageFlags,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+} from 'discord.js';
 import { brandEmbed } from '../../core/embeds.js';
+import { disableRows } from '../../core/components.js';
 import { findCommand } from '../../core/loader.js';
 import { getEffectivePrefix } from '../../core/prefixes.js';
+import { flavor } from '../../utils/humanize.js';
 import { truncate } from '../../utils/text.js';
 
-const CATEGORY_ORDER = [
-  'System',
-  'AI',
-  'VR',
-  'Music',
-  'Media Effects',
-  'Embeds',
-  'Moderation',
-  'UserInfo',
-  'Admin Utils',
-  'Voice',
-  'Settings',
-  'Roles',
-  'Quotes',
-  'Cybersecurity',
-  'Utilities',
-];
+const CATEGORY_META = new Map([
+  ['System', { emoji: '🧭', blurb: 'Getting around the bot' }],
+  ['AI', { emoji: '🤖', blurb: 'Ollama chat & fal.ai generation' }],
+  ['VR', { emoji: '🥽', blurb: 'Headset profiles & Steam VR stats' }],
+  ['Music', { emoji: '🎧', blurb: 'Last.fm / Spotify listening cards' }],
+  ['Media Effects', { emoji: '🎬', blurb: 'FFmpeg glitch, VHS, chroma-key & more' }],
+  ['Embeds', { emoji: '📝', blurb: 'Custom embed workshop' }],
+  ['Moderation', { emoji: '🛡️', blurb: 'Jail, kick, ban, mute, warn' }],
+  ['UserInfo', { emoji: '👤', blurb: 'Profiles, avatars, timezones' }],
+  ['Admin Utils', { emoji: '🃏', blurb: 'Role-gated special utilities' }],
+  ['Voice', { emoji: '🔊', blurb: 'Voice channel audio playback' }],
+  ['Settings', { emoji: '⚙️', blurb: 'Prefixes & configuration' }],
+  ['Roles', { emoji: '🎭', blurb: 'Reaction roles, autoroles, boosters' }],
+  ['Quotes', { emoji: '💬', blurb: 'Community quote book' }],
+  ['Cybersecurity', { emoji: '🔐', blurb: 'Defensive audits & lookups' }],
+  ['Utilities', { emoji: '🧰', blurb: 'Weather, crypto, polls, reminders…' }],
+]);
+
+const categoryOrder = [...CATEGORY_META.keys()];
 
 function describeOptions(schema = []) {
   return schema.map((option) => (option.required ? `<${option.name}>` : `[${option.name}]`)).join(' ');
 }
 
+function groupByCategory(client) {
+  const byCategory = new Map();
+  for (const command of client.commands.values()) {
+    if (!byCategory.has(command.category)) byCategory.set(command.category, []);
+    byCategory.get(command.category).push(command);
+  }
+  return new Map(
+    [...byCategory.entries()].sort(([a], [b]) => {
+      const ia = categoryOrder.indexOf(a);
+      const ib = categoryOrder.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    })
+  );
+}
+
+function overviewEmbed(byCategory, prefix) {
+  const embed = brandEmbed()
+    .setTitle('🕶️ VRCd Bot — Command Browser')
+    .setDescription(
+      `${flavor('helpIntro')}\n\nPrefix: \`${prefix}\` · every command also works as a slash command.\n` +
+        `Need one command's details? \`${prefix}help <command>\``
+    );
+  for (const [category, commands] of byCategory) {
+    const meta = CATEGORY_META.get(category) ?? { emoji: '📦', blurb: '' };
+    embed.addFields({
+      name: `${meta.emoji} ${category} · ${commands.length}`,
+      value: meta.blurb || '​',
+      inline: true,
+    });
+  }
+  return embed;
+}
+
+function categoryEmbed(category, commands, prefix) {
+  const meta = CATEGORY_META.get(category) ?? { emoji: '📦', blurb: '' };
+  const lines = commands
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((command) => `**\`${prefix}${command.name}\`** — ${truncate(command.description ?? '', 90)}`);
+  return brandEmbed()
+    .setTitle(`${meta.emoji} ${category}`)
+    .setDescription(truncate(lines.join('\n'), 4096))
+    .addFields({ name: 'Details', value: `\`${prefix}help <command>\` shows arguments, aliases & subcommands.` });
+}
+
+function buildRows(byCategory, activeCategory) {
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId('helpnav:category')
+    .setPlaceholder('Browse a category…')
+    .addOptions(
+      [...byCategory.keys()].slice(0, 25).map((category) => {
+        const meta = CATEGORY_META.get(category) ?? { emoji: '📦', blurb: '' };
+        const option = new StringSelectMenuOptionBuilder()
+          .setValue(category)
+          .setLabel(category)
+          .setEmoji(meta.emoji)
+          .setDefault(category === activeCategory);
+        if (meta.blurb) option.setDescription(truncate(meta.blurb, 100));
+        return option;
+      })
+    );
+  const homeRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('helpnav:home').setLabel('Overview').setEmoji('🏠').setStyle(ButtonStyle.Secondary).setDisabled(!activeCategory)
+  );
+  return [new ActionRowBuilder().addComponents(menu), homeRow];
+}
+
 export default {
   name: 'help',
   category: 'System',
-  description: 'Lists every command by category, or shows details for one command.',
+  description: 'Interactive command browser, or details for one command.',
   usage: '.help [command]',
   aliases: ['commands', 'h'],
   options: [{ name: 'command', type: 'string', description: 'Command name to inspect', required: false }],
@@ -74,32 +154,42 @@ export default {
       return ctx.reply({ embeds: [embed] });
     }
 
-    // ── Index view ───────────────────────────────────────────────────────
-    const byCategory = new Map();
-    for (const command of ctx.client.commands.values()) {
-      if (!byCategory.has(command.category)) byCategory.set(command.category, []);
-      byCategory.get(command.category).push(command);
-    }
+    // ── Interactive browser ──────────────────────────────────────────────
+    const byCategory = groupByCategory(ctx.client);
+    let activeCategory = null;
 
-    const orderedCategories = [...byCategory.keys()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a);
-      const ib = CATEGORY_ORDER.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    const browser = await ctx.reply({
+      embeds: [overviewEmbed(byCategory, prefix)],
+      components: buildRows(byCategory, activeCategory),
     });
 
-    const embed = brandEmbed()
-      .setTitle('🕶️ VRCd Bot — Command Index')
-      .setDescription(`Prefix: \`${prefix}\` (slash commands mirror everything)\nUse \`${prefix}help <command>\` for arguments & aliases.`);
+    const collector = browser.createMessageComponentCollector({
+      filter: (component) => component.customId.startsWith('helpnav:'),
+      time: 180_000,
+    });
 
-    for (const category of orderedCategories) {
-      const commands = byCategory
-        .get(category)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((command) => `\`${command.name}\``)
-        .join(' ');
-      embed.addFields({ name: category, value: truncate(commands, 1024) });
-    }
+    collector.on('collect', async (component) => {
+      if (component.user.id !== ctx.user.id) {
+        await component.reply({ content: flavor('notYours'), flags: MessageFlags.Ephemeral }).catch(() => {});
+        return;
+      }
+      collector.resetTimer();
+      if (component.customId === 'helpnav:home' && component.isButton()) {
+        activeCategory = null;
+        await component.update({ embeds: [overviewEmbed(byCategory, prefix)], components: buildRows(byCategory, null) }).catch(() => {});
+        return;
+      }
+      if (component.isStringSelectMenu()) {
+        activeCategory = component.values[0];
+        const commands = byCategory.get(activeCategory) ?? [];
+        await component
+          .update({ embeds: [categoryEmbed(activeCategory, commands, prefix)], components: buildRows(byCategory, activeCategory) })
+          .catch(() => {});
+      }
+    });
 
-    return ctx.reply({ embeds: [embed] });
+    collector.on('end', async () => {
+      await browser.edit({ components: disableRows(buildRows(byCategory, activeCategory)) }).catch(() => {});
+    });
   },
 };

@@ -2,7 +2,9 @@
  * .ban — fully blacklists an account from the guild's connection pools.
  * Works on non-members too (hackban by ID / mention).
  */
-import { brandEmbed } from '../../core/embeds.js';
+import { ButtonStyle } from 'discord.js';
+import { brandEmbed, errorEmbed } from '../../core/embeds.js';
+import { confirmDialog } from '../../core/components.js';
 import { findActionBlocker, logModAction } from './_modShared.js';
 
 export default {
@@ -30,6 +32,18 @@ export default {
       if (blocker) return ctx.replyError('Cannot ban', blocker);
     }
 
+    // Native confirmation — bans are irreversible enough to warrant a beat.
+    const confirmation = await confirmDialog(ctx, {
+      embed: brandEmbed()
+        .setTitle('🔨 Confirm ban')
+        .setDescription(`You're about to ban **${target.tag ?? target.username}** (\`${target.id}\`).`)
+        .addFields({ name: 'Reason', value: reason }),
+      confirmLabel: `Ban ${(target.username ?? 'user').slice(0, 20)}`,
+      confirmStyle: ButtonStyle.Danger,
+      confirmEmoji: '🔨',
+    });
+    if (!confirmation.confirmed) return;
+
     await target
       .send(`You were banned from **${ctx.guild.name}** — reason: ${reason}`)
       .catch(() => {/* DMs closed — proceed regardless */});
@@ -37,7 +51,7 @@ export default {
     try {
       await ctx.guild.members.ban(target.id, { reason: `${ctx.user.tag}: ${reason}`, deleteMessageSeconds: 0 });
     } catch (error) {
-      return ctx.replyError('Ban failed', `Discord refused the ban: ${error.message}`);
+      return confirmation.finalize({ embeds: [errorEmbed('Ban failed', `Discord refused the ban: ${error.message}`)] });
     }
 
     logModAction(ctx.guild.id, { action: 'ban', targetId: target.id, moderatorId: ctx.user.id, reason });
@@ -48,6 +62,6 @@ export default {
         { name: 'Moderator', value: `<@${ctx.user.id}>`, inline: true },
         { name: 'Reason', value: reason }
       );
-    return ctx.reply({ embeds: [embed] });
+    return confirmation.finalize({ embeds: [embed] });
   },
 };

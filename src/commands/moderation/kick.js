@@ -2,7 +2,9 @@
  * .kick — removes a member via the API gateway wrapper, backed by the
  * structural audit log.
  */
-import { brandEmbed } from '../../core/embeds.js';
+import { ButtonStyle } from 'discord.js';
+import { brandEmbed, errorEmbed } from '../../core/embeds.js';
+import { confirmDialog } from '../../core/components.js';
 import { findActionBlocker, logModAction } from './_modShared.js';
 
 export default {
@@ -27,6 +29,18 @@ export default {
     const blocker = findActionBlocker(ctx, member, { needBotAbility: 'kick' });
     if (blocker) return ctx.replyError('Cannot kick', blocker);
 
+    // Native confirmation before removing someone from the server.
+    const confirmation = await confirmDialog(ctx, {
+      embed: brandEmbed()
+        .setTitle('👢 Confirm kick')
+        .setDescription(`You're about to kick **${target.tag ?? target.username}** (\`${target.id}\`).`)
+        .addFields({ name: 'Reason', value: reason }),
+      confirmLabel: `Kick ${(target.username ?? 'user').slice(0, 20)}`,
+      confirmStyle: ButtonStyle.Danger,
+      confirmEmoji: '👢',
+    });
+    if (!confirmation.confirmed) return;
+
     // Courtesy DM before the kick (afterwards we share no mutual server).
     await target
       .send(`You were kicked from **${ctx.guild.name}** — reason: ${reason}`)
@@ -35,7 +49,7 @@ export default {
     try {
       await member.kick(`${ctx.user.tag}: ${reason}`);
     } catch (error) {
-      return ctx.replyError('Kick failed', `Discord refused the kick: ${error.message}`);
+      return confirmation.finalize({ embeds: [errorEmbed('Kick failed', `Discord refused the kick: ${error.message}`)] });
     }
 
     logModAction(ctx.guild.id, { action: 'kick', targetId: target.id, moderatorId: ctx.user.id, reason });
@@ -46,6 +60,6 @@ export default {
         { name: 'Moderator', value: `<@${ctx.user.id}>`, inline: true },
         { name: 'Reason', value: reason }
       );
-    return ctx.reply({ embeds: [embed] });
+    return confirmation.finalize({ embeds: [embed] });
   },
 };

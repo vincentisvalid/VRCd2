@@ -6,6 +6,7 @@ import { Events, MessageFlags } from 'discord.js';
 import { collectSlashOptions } from '../core/options.js';
 import { CommandContext } from '../core/context.js';
 import { runCommand } from '../core/dispatcher.js';
+import { routeComponent } from '../core/componentRouter.js';
 import { errorEmbed } from '../core/embeds.js';
 import { createLogger } from '../core/logger.js';
 
@@ -14,6 +15,12 @@ const log = createLogger('interactionCreate');
 export default {
   name: Events.InteractionCreate,
   async execute(interaction) {
+    // Persistent components (poll votes, player controls) route by customId
+    // prefix; wizard components are owned by their short-lived collectors.
+    if (interaction.isButton() || interaction.isAnySelectMenu()) {
+      await routeComponent(interaction);
+      return;
+    }
     if (!interaction.isChatInputCommand()) return;
 
     const command = interaction.client.commands.get(interaction.commandName);

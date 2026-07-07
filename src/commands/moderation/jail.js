@@ -7,10 +7,11 @@
  * denied visibility in every existing channel, plus a #prison channel only
  * that role (and staff) can see.
  */
-import { ChannelType, PermissionFlagsBits } from 'discord.js';
+import { ButtonStyle, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { db } from '../../database/index.js';
 import { config } from '../../core/config.js';
-import { brandEmbed } from '../../core/embeds.js';
+import { brandEmbed, errorEmbed } from '../../core/embeds.js';
+import { confirmDialog } from '../../core/components.js';
 import { findActionBlocker, logModAction } from './_modShared.js';
 import { createLogger } from '../../core/logger.js';
 
@@ -82,7 +83,18 @@ export default {
       return ctx.replyError('Already jailed', `${target.username} is already in prison — use \`.unjail\` first.`);
     }
 
-    await ctx.defer();
+    // Native confirmation — jailing strips every role the member holds.
+    const confirmation = await confirmDialog(ctx, {
+      embed: brandEmbed()
+        .setTitle('🔒 Confirm jail')
+        .setDescription(`You're about to strip **${target.tag ?? target.username}** of all roles and confine them to prison.`)
+        .addFields({ name: 'Reason', value: reason }),
+      confirmLabel: `Jail ${(target.username ?? 'user').slice(0, 20)}`,
+      confirmStyle: ButtonStyle.Danger,
+      confirmEmoji: '🔒',
+    });
+    if (!confirmation.confirmed) return;
+
     const { role, channel } = await provisionJail(ctx.guild);
 
     // Snapshot every removable role, then hard-swap to the jail role only.
@@ -93,7 +105,7 @@ export default {
     try {
       await member.roles.set([role.id], `Jailed by ${ctx.user.tag}: ${reason}`);
     } catch (error) {
-      return ctx.replyError('Role swap failed', `Discord refused the role update: ${error.message}`);
+      return confirmation.finalize({ embeds: [errorEmbed('Role swap failed', `Discord refused the role update: ${error.message}`)] });
     }
 
     db.collection('jail').set(jailKey, {
@@ -114,6 +126,6 @@ export default {
         { name: 'Roles stripped', value: String(previousRoleIds.length), inline: true },
         { name: 'Moderator', value: `<@${ctx.user.id}>`, inline: true }
       );
-    return ctx.reply({ embeds: [embed] });
+    return confirmation.finalize({ embeds: [embed] });
   },
 };
