@@ -47,6 +47,7 @@ export async function runFalModel({ apiKey, model, input }) {
     if (error.response) {
       const status = error.response.status;
       if (status === 401 || status === 403) throw new Error('fal.ai rejected the API key (unauthorised).');
+      if (status === 404) throw new Error(`fal.ai has no model at \`${model}\` — the route may have been renamed; update the matching entry under \`fal\` in config.json.`);
       if (status === 422) throw new Error(`fal.ai rejected the input payload: ${JSON.stringify(error.response.data?.detail ?? {}).slice(0, 300)}`);
       if (status === 429) throw new Error('fal.ai rate limit hit — wait a moment and retry.');
       throw new Error(`fal.ai returned HTTP ${status}.`);

@@ -1,6 +1,7 @@
 /**
- * .editimage — mutates an attached image via fal.ai's gpt-images-v2 edit
- * route, with the same key-security workflow as the other fal commands.
+ * .editimage — mutates an attached image via fal.ai's image-edit route
+ * (config: fal.editImageModel, default FLUX.2 klein 4B edit), with the same
+ * key-security workflow as the other fal commands.
  */
 import { runFalModel, extractImageUrl } from '../../services/falai.js';
 import { beginSecuredFalRequest } from './_falSecurity.js';

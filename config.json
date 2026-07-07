@@ -27,7 +27,7 @@
   "fal": {
     "text2imgModel": "fal-ai/flux/dev",
     "text2vidModel": "fal-ai/ltx-video",
-    "editImageModel": "fal-ai/gpt-images-v2/edit",
+    "editImageModel": "fal-ai/flux-2/klein/4b/edit",
     "requestTimeoutMs": 300000
   },
   "media": {
